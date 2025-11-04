@@ -1,8 +1,7 @@
-// ---------------- GameScreen.tsx ----------------
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { socket } from "./App";
-import { API_BASE } from "./apiConfig";
+import { API_BASE } from "./apiConfig"; // ✅ 修正点①
 
 // lightweight-charts（個別銘柄チャート用）⬇
 import { createChart, CandlestickSeries } from "lightweight-charts";
@@ -25,30 +24,21 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type Position = { qty: number; avgPrice: number };
-type Player = {
-  cash: number;
-  holdings: Record<string, Position>;
-  totalValue: number;
-  pnl: number;
-};
+// ★ 修正: 値と型を分けてインポート
+import {
+  TICKERS,
+  TICKER_DISPLAY_NAME,
+  NEWS_IMAGE_MAP,
+  DEFAULT_NEWS_IMAGE
+} from "./constants"; 
+import type {
+  TickerId,
+  NewsEvent,
+  Player,
+  Position
+} from "./constants"; 
 
-const TICKERS = [
-  "銀行株", "半導体株", "自動車株", "製薬株", "ニトリ株",
-  "電力株", "航空株", "任天堂株", "ENEOS株", "ゴールド",
-  "為替(USD/JPY)", "日経平均",
-];
-
-type NewsEvent = {
-  name: string;
-  ticker: string;
-  a: number;
-  k: number;
-  tick: number;
-  description: string;
-};
-
-// --- ローソク足に変換する関数 ---
+// --- ローソク足に変換する関数 (変更なし) ---
 function pricesToCandles(prices: number[]): CandlestickData[] {
   if (!prices?.length) return [];
   const arr = prices.length > 120 ? prices.slice(-120) : prices;
@@ -61,19 +51,6 @@ function pricesToCandles(prices: number[]): CandlestickData[] {
     return { time, open, high, low, close };
   });
 }
-
-const NEWS_IMAGE_MAP: Record<string, string> = {
-  "パンデミック発生": "/images/news/corona_shock.png",
-  "AIブーム到来！": "/images/news/ai_boom.png",
-  "歴史的な円安": "/images/news/yen_shock.png",
-  "日銀、金利引き上げ": "/images/news/interest_rate.png",
-  "インバウンド絶好調": "/images/news/tourism_boom.png",
-  "中東情勢、悪化": "/images/news/oil_high.png",
-};
-const DEFAULT_NEWS_IMAGE = "/images/news/default.png";
-
-
-
 
 // ========== ニュースモーダル ==========
 function NewsModal({ ev, onClose }: { ev: NewsEvent; onClose: () => void }) {
@@ -122,7 +99,8 @@ function NewsModal({ ev, onClose }: { ev: NewsEvent; onClose: () => void }) {
           <p style={{ textAlign: "center", marginBottom: "0.5rem", lineHeight: 1.6 }}>
             {ev.description}
           </p>
-          <p style={{ textAlign: "center", fontSize: "0.875rem" }}>影響銘柄：{ev.ticker}</p>
+          {/* ★ 修正: ev.ticker (ID) を表示名に変換 */}
+          <p style={{ textAlign: "center", fontSize: "0.875rem" }}>影響銘柄：{TICKER_DISPLAY_NAME[ev.ticker]}</p>
         </div>
       </div>
     </div>,
@@ -135,11 +113,12 @@ function NewsModal({ ev, onClose }: { ev: NewsEvent; onClose: () => void }) {
 
 // ========== 1枚のタイル(銘柄チャート) ==========
 function ChartTile({
-  ticker, price, holdingQty,
+  tickerId, // ★ 修正: ticker -> tickerId
+  price, holdingQty,
   registerChart,
   onSelect, selected,
 }: {
-  ticker: string;
+  tickerId: TickerId; // ★ 修正: string -> TickerId
   price?: number;
   holdingQty?: number;
   registerChart: (el: HTMLDivElement | null) => void;
@@ -171,7 +150,8 @@ function ChartTile({
         <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "rgb(134,239,172)" }}>
           {price?.toFixed(2)}
         </div>
-        <div style={{ fontSize: "0.875rem", fontWeight: "bold", color: "white" }}>{ticker}</div>
+        {/* ★ 修正: tickerId から表示名(日本語)を引く */}
+        <div style={{ fontSize: "0.875rem", fontWeight: "bold", color: "white" }}>{TICKER_DISPLAY_NAME[tickerId]}</div>
       </div>
 
       {/* チャート描画領域 */}
@@ -200,15 +180,16 @@ export default function GameScreen({ playerName }: { playerName: string }) {
     cash: 100_000_000,
     totalValue: 100_000_000,
     pnl: 0,
-    holdings: Object.fromEntries(TICKERS.map(t => [t, { qty: 0, avgPrice: 0 }])) as Record<string, Position>,
+    holdings: Object.fromEntries(TICKERS.map(t => [t, { qty: 0, avgPrice: 0 }])) as Record<TickerId, Position>,
   });
 
-  const [selectedTicker, setSelectedTicker] = useState<string>(TICKERS[0]);
+  const [selectedTicker, setSelectedTicker] = useState<TickerId>(TICKERS[0]);
   const [qty, setQty] = useState("");
-  const [latestPrices, setLatestPrices] = useState<Record<string, number>>({});
+  const [latestPrices, setLatestPrices] = useState<Partial<Record<TickerId, number>>>({});
   const [partialQty, setPartialQty] = useState("");
-  const [closeModal, setCloseModal] = useState<{ ticker: string; qty: number } | null>(null);
+  const [closeModal, setCloseModal] = useState<{ ticker: TickerId; qty: number } | null>(null);
   const [newsPopup, setNewsPopup] = useState<NewsEvent | null>(null);
+
   const [avgOthersHistory, setAvgOthersHistory] = useState<Array<{ time: number; value: number }>>([]); //他プレイヤーの平均用
 
   // --- 資産履歴（Recharts用） ---
@@ -216,11 +197,11 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   const INITIAL_CAPITAL = 100_000_000;
 
   // --- チャート管理（左の12個用） ---
-  const chartsRef = useRef<Record<string, IChartApi>>({});
-  const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick">>>({});
+  const chartsRef = useRef<Record<string, IChartApi | undefined>>({})
+  const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick"> | undefined>>({})
 
   /** 各銘柄タイルのDOMに軽量チャートを作成 */
-  const makeRegisterChart = (ticker: string) => (el: HTMLDivElement | null) => {
+  const makeRegisterChart = (ticker: TickerId) => (el: HTMLDivElement | null) => {
     if (!el || chartsRef.current[ticker]) return;
     const chart = createChart(el, {
       width: el.clientWidth,
@@ -248,56 +229,48 @@ export default function GameScreen({ playerName }: { playerName: string }) {
 
 
   // ✅ カスタムツールチップ（資産＋損益の2行表示）
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload || !payload.length) return null;
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    const currentValue = Math.round(Number(payload[0].value));
+    const pnl = currentValue - INITIAL_CAPITAL;
+    const isPlus = pnl >= 0;
 
-  // 整数に丸めた資産
-  const currentValue = Math.round(Number(payload[0].value));
-
-  // 損益（こちらも整数に丸める）
-  const pnl = currentValue - INITIAL_CAPITAL;
-  const isPlus = pnl >= 0;
-
-  return (
-    <div
-      style={{
-        background: "#1f2937",
-        border: "1px solid #374151",
-        color: "white",
-        padding: "0.5rem 0.75rem",
-        borderRadius: 6,
-      }}
-    >
-      {/* 時刻表示 */}
-      <div>
-        {new Date(label * 1000).toLocaleTimeString("ja-JP", { hour12: false })}
+    return (
+      <div
+        style={{
+          background: "#1f2937",
+          border: "1px solid #374151",
+          color: "white",
+          padding: "0.5rem 0.75rem",
+          borderRadius: 6,
+        }}
+      >
+        <div>
+          {new Date(label * 1000).toLocaleTimeString("ja-JP", { hour12: false })}
+        </div>
+        <div style={{ color: "white" }}>
+          資産：¥{currentValue.toLocaleString()}
+        </div>
+        <div>
+          <span style={{ color: "white" }}>損益：</span>
+          <span style={{ color: isPlus ? "#22c55e" : "#ef4444" }}>
+            {isPlus ? "+" : "-"}
+            {Math.abs(pnl).toLocaleString()}
+          </span>
+        </div>
       </div>
-
-      {/* 資産：常に白文字・カンマ区切り */}
-      <div style={{ color: "white" }}>
-        資産：¥{currentValue.toLocaleString()}
-      </div>
-
-      {/* 損益：文字「損益」は白、数値部分だけ色替え */}
-      <div>
-        <span style={{ color: "white" }}>損益：</span>
-        <span style={{ color: isPlus ? "#22c55e" : "#ef4444" }}>
-          {isPlus ? "+" : "-"}
-          {Math.abs(pnl).toLocaleString()}
-        </span>
-      </div>
-    </div>
-  );
-};
+    );
+  };
 
   useEffect(() => {
-  console.log("✅ avgOthersHistory =", avgOthersHistory);
-}, [avgOthersHistory]);
+    console.log("✅ avgOthersHistory =", avgOthersHistory);
+  }, [avgOthersHistory]);
 
 
   // --- 画面リサイズへの反応 ---
   useEffect(() => {
     const onResize = () => {
+      // ★ 修正: TickerId を使う
       for (const ticker of TICKERS) {
         const chart = chartsRef.current[ticker];
         if (!chart) continue;
@@ -314,13 +287,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   // --- サーバーからの状態受信（価格・プレイヤー・ニュース） ---
   useEffect(() => {
     const handleGameTick = (serverState: any) => {
-      const latest: Record<string, number> = {};
+      // ★ 修正: TickerId をキーにする
+      const latest: Partial<Record<TickerId, number>> = {};
+      // ★ 修正: TickerId を使う
       for (const t of TICKERS) {
-        const prices = serverState?.prices?.[t];
+        const prices = serverState?.prices?.[t]; // t は "BANK" など
         if (!prices?.length) continue;
         latest[t] = prices[prices.length - 1];
 
-        // 左の各タイルのチャート更新
         const s = seriesRef.current[t];
         if (s) s.setData(pricesToCandles(prices));
       }
@@ -330,23 +304,21 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     const handleGameNews = (ev: NewsEvent) => setNewsPopup(ev);
 
     const handlePlayersUpdate = (all: Record<string, Player>) => {
-      // 自分
       const me = all[playerName];
       if (me) {
-        // ✅ サーバーのtotalValueを無視し、常に最新価格で総資産を再計算
         const recalculatedTotal =
           me.cash +
           Object.entries(me.holdings).reduce((sum, [ticker, pos]) => {
             if (!pos.qty) return sum;
-            const px = latestPrices[ticker] ?? pos.avgPrice;
+            // ★ 修正: TickerId を使う
+            const px = latestPrices[ticker as TickerId] ?? pos.avgPrice;
             return sum + px * pos.qty;
           }, 0);
 
         setPlayer({ ...me, totalValue: recalculatedTotal });
       }
 
-      const otherPlayers = Object.entries(all).filter(
-      ([name]) => name !== playerName);
+      const otherPlayers = Object.entries(all).filter(([name]) => name !== playerName);
 
       if (otherPlayers.length > 0) {
         const t = Math.floor(Date.now() / 1000);
@@ -355,7 +327,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             return sum + (pl.totalValue ?? pl.cash);
           }, 0) / otherPlayers.length;
 
-        // ✅ 平均履歴に追記
         setAvgOthersHistory(prev => {
           if (prev.length && prev[prev.length - 1].time === t) return prev;
           return [...prev, { time: t, value: avgValue }];
@@ -384,38 +355,39 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 
   // --- クライアント側でも、価格/保有が変わったら総資産を再計算して履歴に追記（補完用） ---
-  // これが資産グラフ用の部分
   useEffect(() => {
-  const now = Math.floor(Date.now() / 1000);
+    const now = Math.floor(Date.now() / 1000);
 
-  const totalValue =
-    (player?.cash ?? 0) +
-    Object.entries(player.holdings).reduce((sum, [ticker, pos]) => {
-      if (!pos.qty) return sum;
-      const px = latestPrices[ticker] ?? pos.avgPrice ?? 0;
-      return sum + px * pos.qty;
-    }, 0);
+    const totalValue =
+      (player?.cash ?? 0) +
+      Object.entries(player.holdings).reduce((sum, [ticker, pos]) => {
+        if (!pos.qty) return sum;
+        // ★ 修正: TickerId を使う
+        const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
+        return sum + px * pos.qty;
+      }, 0);
 
-  setAssetHistory(prev => {
-    if (prev.length && prev[prev.length - 1].time === now) return prev;
-    return [
-      ...prev,
-      {
-        time: now,
-        value: totalValue,
-        profit: Math.max(totalValue, INITIAL_CAPITAL), // 基準線より上だけ
-        loss:  Math.min(totalValue, INITIAL_CAPITAL), // 基準線より下だけ
-      },
-    ];
-  });
-}, [latestPrices, player]);
+    setAssetHistory(prev => {
+      if (prev.length && prev[prev.length - 1].time === now) return prev;
+      return [
+        ...prev,
+        {
+          time: now,
+          value: totalValue,
+          profit: Math.max(totalValue, INITIAL_CAPITAL), // 基準線より上だけ
+          loss:   Math.min(totalValue, INITIAL_CAPITAL), // 基準線より下だけ
+        },
+      ];
+    });
+  }, [latestPrices, player]);
 
 
 
 
   
   // --- 注文まわり ---
-  const order = async (side: "buy" | "sell", customTicker?: string, customQty?: number) => {
+  // ★ 修正: TickerId を使う
+  const order = async (side: "buy" | "sell", customTicker?: TickerId, customQty?: number) => {
     const ticker = customTicker || selectedTicker;
     const quantity = customQty ?? Number(qty);
     if (!ticker) return alert("銘柄を選択してください。");
@@ -424,6 +396,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       const res = await fetch(`${API_BASE}/api/trade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // ★ 修正: TickerId を送信
         body: JSON.stringify({ player_id: playerName, ticker, side, quantity }),
       });
       const data = await res.json();
@@ -443,481 +416,463 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     setCloseModal(null);
   };
 
-  // --- 画面 ---
-return (
-  <div
-    className="flex h-screen bg-black text-white"
-    style={{ fontFamily: "sans-serif", overflow: "hidden" }}
-  >
-    {/* 左：3列グリッド（固定表示・スクロールなし） */}
-    <div
-      className="grid gap-3 p-4"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gridTemplateRows: "repeat(4, 1fr)",
-        flex: 3,
-        overflow: "hidden",
-      }}
-    >
-      {TICKERS.map((t) => (
-        <ChartTile
-          key={t}
-          ticker={t}
-          price={latestPrices[t]}
-          holdingQty={player.holdings[t]?.qty}
-          registerChart={makeRegisterChart(t)}
-          onSelect={() => setSelectedTicker(t)}
-          selected={selectedTicker === t}
-        />
-      ))}
-    </div>
+  // ★ 修正: TickerId を使う
+  //const currentPosition = player.holdings[selectedTicker] || { qty: 0, avgPrice: 0 };
 
-    {/* 右：操作パネル（右カラム全体のみスクロール） */}
+  // --- 画面 ---
+  return (
     <div
-      style={{
-        flex: 1,
-        minWidth: 350,
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        overflowY: "auto",
-        background: "rgb(17,24,39)", // ← ✅白→ダークに変更
-        color: "white",
-      }}
+      className="flex h-screen bg-black text-white"
+      style={{ fontFamily: "sans-serif", overflow: "hidden" }}
     >
+      {/* 左：3列グリッド（固定表示・スクロールなし） */}
       <div
+        className="grid gap-3 p-4"
         style={{
-          padding: "1rem",
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          gap: "1rem",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gridTemplateRows: "repeat(4, 1fr)",
+          flex: 3,
+          overflow: "hidden",
         }}
       >
-        {/* === 資産パネル === */}
-        <div style={{ marginBottom: "1rem", flexShrink: 0 }}>
-          <h2 className="text-lg font-semibold mb-1">💰 {playerName} の資産</h2>
-          {(() => {
-            const fmt0 = { maximumFractionDigits: 0 } as const;
-
-            // ✅ 総資産（現金＋保有株評価額）
-            const totalValue =
-              (player?.cash ?? 0) +
-              Object.entries(player?.holdings ?? {}).reduce((sum, [ticker, pos]) => {
-                if (!pos?.qty) return sum;
-                const px = latestPrices[ticker] ?? pos.avgPrice ?? 0;
-                return sum + px * pos.qty;
-              }, 0);
-
-            // ✅ 初期資産との差分
-            const capitalDelta = totalValue - INITIAL_CAPITAL;
-
-            // ✅ 現在の保有株の評価額（現金を含めない）
-            const holdingsValue = Object.entries(player.holdings).reduce(
-              (sum, [ticker, pos]) => {
-                if (!pos.qty) return sum;
-                const px = latestPrices[ticker] ?? pos.avgPrice ?? 0;
-                return sum + px * pos.qty;
-              },
-              0
-            );
-
-            // ✅ 含み損益（評価損益のみ）
-            const totalPnl = Object.entries(player.holdings).reduce((acc, [ticker, pos]) => {
-              if (!pos.qty) return acc;
-              const px = latestPrices[ticker] ?? pos.avgPrice ?? 0;
-              return acc + (px - pos.avgPrice) * pos.qty;
-            }, 0);
-
-            // ✅ 損益率（分母＝保有株評価額）
-            const pnlRate =
-              holdingsValue > 0 ? (totalPnl / holdingsValue) * 100 : 0;
-
-            return (
-              <>
-                <p style={{ fontSize: "1.125rem" }}>
-                  総資産: ¥{totalValue.toLocaleString(undefined, fmt0)}
-                  <span
-                    style={{
-                      marginLeft: "0.75rem",
-                      fontWeight: "bold",
-                      color: capitalDelta >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
-                    }}
-                  >
-                    ({capitalDelta >= 0 ? "+" : ""}
-                    {capitalDelta.toLocaleString(undefined, fmt0)})
-                  </span>
-                </p>
-
-                <p>現金: ¥{(player.cash ?? 0).toLocaleString(undefined, fmt0)}</p>
-
-                <p>
-                  評価損益:{" "}
-                  <span className={totalPnl >= 0 ? "text-green-400" : "text-red-400"}>
-                    ¥{totalPnl.toLocaleString(undefined, fmt0)}
-                  </span>
-                  {/* ✅ ここに損益率（％）を追加 */}
-                  {holdingsValue > 0 && (
-                    <span
-                      style={{
-                        marginLeft: "0.5rem",
-                        fontWeight: "bold",
-                        color: totalPnl >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
-                      }}
-                    >
-                      ({totalPnl >= 0 ? "+" : ""}
-                      {pnlRate.toFixed(2)}%)
-                    </span>
-                  )}
-                </p>
-              </>
-            );
-          })()}
-        </div>
-
-
-
-        {/* === 資産グラフ === */}
-        <div
-          style={{
-            width: "100%",
-            height: 180,
-            border: "1px solid rgb(55, 65, 81)",
-            borderRadius: 8,
-            background: "#1f2937",
-            padding: "0.25rem 0.5rem",
-          }}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={assetHistory}>
-              <XAxis dataKey="time" hide />
-              <YAxis hide domain={["auto", "auto"]} />
-
-              {/* ✅ 初期資産の基準ライン（点線・灰色） */}
-              <ReferenceLine
-                y={INITIAL_CAPITAL}
-                stroke="#6b7280"            // ←少し濃いグレー
-                strokeDasharray="4 4"
-              />
-
-              {/* ✅ 折れ線（常に表示・灰色でシンプル） */}
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke="#d1d5db"           // ←ニュートラルな灰色
-                strokeWidth={2}
-                dot={false}
-                isAnimationActive={false}
-              />
-
-              {/* ✅ 基準線より上の部分だけ緑で塗る（value - INITIAL_CAPITAL） */}
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="none"
-                fill="#22c55e"
-                fillOpacity={0.25}
-                isAnimationActive={false}
-                baseValue={INITIAL_CAPITAL}
-              />
-
-              {/* ✅ 基準線より下の部分だけ赤で塗る */}
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="none"
-                fill="#ef4444"
-                fillOpacity={0.25}
-                isAnimationActive={false}
-                baseValue={INITIAL_CAPITAL}
-              />
-
-              {/* ✅ カスタムTooltip（前のやつを使う） */}
-              <Tooltip content={<CustomTooltip />} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-
-
-
-        {/* === 注文パネル === */}
-        <div
-          style={{
-            marginTop: "0.5rem",
-            borderTop: "1px solid rgb(55, 65, 81)",
-            paddingTop: "1rem",
-            flexShrink: 0,
-          }}
-        >
-          <h2 className="text-lg font-semibold mb-2">🛒 注文パネル</h2>
-          <p className="mb-2">
-            対象:{" "}
-            <span className="font-bold text-yellow-300 text-xl">
-              {selectedTicker}
-            </span>
-          </p>
-
-          {(() => {
-            const currentPrice = latestPrices[selectedTicker];
-            const maxTradableQty =
-              currentPrice && currentPrice > 0
-                ? Math.floor((player?.cash ?? 0) / currentPrice)
-                : 0;
-            const fmt0 = { maximumFractionDigits: 0 } as const;
-            const pos =
-              player.holdings[selectedTicker] || ({ qty: 0, avgPrice: 0 } as {
-                qty: number;
-                avgPrice: number;
-              });
-
-            return (
-              <>
-                <p className="text-sm text-gray-400">
-                  保有: {pos.qty}株 @ {pos.avgPrice.toFixed(1)}
-                </p>
-                <p className="text-sm text-gray-400">
-                  最大 (新規):{" "}
-                  {maxTradableQty.toLocaleString(undefined, fmt0)} 株まで
-                </p>
-              </>
-            );
-          })()}
-
-          <input
-            type="number"
-            placeholder="数量"
-            className="rounded w-full mb-2 mt-2"
-            style={{
-              color: "white",
-              background: "rgb(55, 65, 81)",
-              border: "1px solid rgb(75, 85, 99)",
-              padding: "0.5rem",
-            }}
-            value={qty}
-            onChange={(e) => setQty(e.target.value)}
+        {TICKERS.map((t) => (
+          <ChartTile
+            key={t}
+            tickerId={t}
+            price={latestPrices[t]}
+            holdingQty={player.holdings[t]?.qty}
+            registerChart={makeRegisterChart(t)}
+            onSelect={() => setSelectedTicker(t)}
+            selected={selectedTicker === t}
           />
-          <div className="flex gap-2">
-            <button
-              onClick={() => order("buy")}
-              className="flex-1 bg-green-600 hover:bg-green-700 rounded py-2 font-bold"
-            >
-              買い (LONG)
-            </button>
-            <button
-              onClick={() => order("sell")}
-              className="flex-1 bg-red-600 hover:bg-red-700 rounded py-2 font-bold"
-            >
-              売り (SHORT)
-            </button>
-          </div>
-        </div>
+        ))}
+      </div>
 
-        {/* === 保有銘柄一覧（右全体スクロールに合わせて overflow は付けない） === */}
+      {/* 右：操作パネル（右カラム全体のみスクロール） */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 350,
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          overflowY: "auto",
+          background: "rgb(17,24,39)", // ← ✅白→ダークに変更
+          color: "white",
+        }}
+      >
         <div
           style={{
-            marginTop: "1rem",
-            borderTop: "1px solid rgb(55, 65, 81)",
-            paddingTop: "1rem",
+            padding: "1rem",
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: "0.75rem",
+            gap: "1rem",
           }}
         >
-          <h2 className="text-lg font-semibold mb-2">📦 保有銘柄</h2>
-          {Object.entries(player.holdings)
-            .filter(([_, pos]) => !!pos.qty)
-            .map(([ticker, pos]) => {
-              const px = latestPrices[ticker] ?? 0;
-              const pnl = (px - pos.avgPrice) * pos.qty;
+          {/* === 資産パネル === */}
+          <div style={{ marginBottom: "1rem", flexShrink: 0 }}>
+            <h2 className="text-lg font-semibold mb-1">💰 {playerName} の資産</h2>
+            {(() => {
               const fmt0 = { maximumFractionDigits: 0 } as const;
 
-              return (
-                <div
-                  key={ticker}
-                  style={{
-                    background: "rgb(55, 65, 81)",
-                    padding: "0.75rem",
-                    borderRadius: "0.5rem",
-                    border: "1px solid rgb(75, 85, 99)",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "0.25rem",
-                    }}
-                  >
-                    <span className="font-bold text-lg text-yellow-300">
-                      {ticker}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setCloseModal({ ticker, qty: pos.qty });
-                        setPartialQty("");
-                      }}
-                      className="bg-yellow-600 hover:bg-yellow-700 text-black text-sm font-bold px-3 py-1 rounded"
-                    >
-                      決済
-                    </button>
-                  </div>
+              const totalValue =
+                (player?.cash ?? 0) +
+                Object.entries(player?.holdings ?? {}).reduce((sum, [ticker, pos]) => {
+                  if (!pos?.qty) return sum;
+                  const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
+                  return sum + px * pos.qty;
+                }, 0);
 
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "0.875rem",
-                    }}
-                  >
-                    <span
-                      className={pos.qty > 0 ? "text-green-400" : "text-red-400"}
-                    >
-                      {pos.qty > 0 ? "ロング" : "ショート"}:{" "}
-                      {Math.abs(pos.qty)}株
-                    </span>
-                    <span>@ {pos.avgPrice.toFixed(1)}</span>
-                  </div>
+              const capitalDelta = totalValue - INITIAL_CAPITAL;
 
-                  <div style={{ textAlign: "right", marginTop: "0.25rem" }}>
-                    <span className="text-sm">評価損益: </span>
-                    <span
-                      className={pnl >= 0 ? "text-green-400" : "text-red-400"}
-                      style={{ fontWeight: "bold" }}
-                    >
-                      ¥{pnl.toLocaleString(undefined, fmt0)}
-                    </span>
-                  </div>
-                </div>
+              const holdingsValue = Object.entries(player.holdings).reduce(
+                (sum, [ticker, pos]) => {
+                  if (!pos.qty) return sum;
+                  const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
+                  return sum + px * pos.qty;
+                },
+                0
               );
-            })}
-        </div>
-      </div>
-    </div>
-    
-    {/* --- 決済モーダル --- */}
-    {closeModal && (
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "rgba(0, 0, 0, 0.6)",
-          backdropFilter: "blur(4px)",
-          zIndex: 50,
-        }}
-      >
-        <div
-          style={{
-            background: "rgb(31, 41, 55)",
-            color: "white",
-            padding: "1.5rem",
-            borderRadius: "0.75rem",
-            boxShadow:
-              "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
-            width: "400px",
-            border: "1px solid rgb(75, 85, 99)",
-          }}
-        >
-          {/* タイトル */}
-          <h2 className="text-xl font-bold mb-3">
-            {closeModal.ticker} のポジションを決済
-          </h2>
 
-          {/* 現在ポジション */}
-          <div className="text-lg mb-4">
-            現在：
-            <span
-              className={closeModal.qty > 0 ? "text-green-400" : "text-red-400"}
-            >
-              {closeModal.qty > 0 ? "LONG " : "SHORT "}
-              {Math.abs(closeModal.qty)}株
-            </span>
+              const totalPnl = Object.entries(player.holdings).reduce((acc, [ticker, pos]) => {
+                if (!pos.qty) return acc;
+                const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
+                return acc + (px - pos.avgPrice) * pos.qty;
+              }, 0);
+
+              const pnlRate =
+                holdingsValue > 0 ? (totalPnl / holdingsValue) * 100 : 0;
+
+              return (
+                <>
+                  <p style={{ fontSize: "1.125rem" }}>
+                    総資産: ¥{totalValue.toLocaleString(undefined, fmt0)}
+                    <span
+                      style={{
+                        marginLeft: "0.75rem",
+                        fontWeight: "bold",
+                        color: capitalDelta >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
+                      }}
+                    >
+                      ({capitalDelta >= 0 ? "+" : ""}
+                      {capitalDelta.toLocaleString(undefined, fmt0)})
+                    </span>
+                  </p>
+
+                  <p>現金: ¥{(player.cash ?? 0).toLocaleString(undefined, fmt0)}</p>
+
+                  <p>
+                    評価損益:{" "}
+                    <span className={totalPnl >= 0 ? "text-green-400" : "text-red-400"}>
+                      ¥{totalPnl.toLocaleString(undefined, fmt0)}
+                    </span>
+                    {holdingsValue > 0 && (
+                      <span
+                        style={{
+                          marginLeft: "0.5rem",
+                          fontWeight: "bold",
+                          color: totalPnl >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
+                        }}
+                      >
+                        ({totalPnl >= 0 ? "+" : ""}
+                        {pnlRate.toFixed(2)}%)
+                      </span>
+                    )}
+                  </p>
+                </>
+              );
+            })()}
           </div>
 
-          {/* ✅ すべて決済（数量入力不要） */}
-          <button
-            onClick={() => {
-              handleClose(Math.abs(closeModal.qty));
-              setCloseModal(null);
-              setPartialQty("");
-            }}
-            className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg text-lg mb-4"
-          >
-            すべて決済
-          </button>
 
-          {/* ✅ 一部決済 */}
-          <div style={{ borderTop: "1px solid rgb(55, 65, 81)", paddingTop: "1rem" }}>
-            <p className="text-sm mb-2">一部決済する数量を入力 (最大: {Math.abs(closeModal.qty)})</p>
+
+          {/* === 資産グラフ === */}
+          <div
+            style={{
+              width: "100%",
+              height: 180,
+              border: "1px solid rgb(55, 65, 81)",
+              borderRadius: 8,
+              background: "#1f2937",
+              padding: "0.25rem 0.5rem",
+            }}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={assetHistory}>
+                <XAxis dataKey="time" hide />
+                <YAxis hide domain={["auto", "auto"]} />
+                <ReferenceLine
+                  y={INITIAL_CAPITAL}
+                  stroke="#6b7280"       // ←少し濃いグレー
+                  strokeDasharray="4 4"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#d1d5db"       // ←ニュートラルな灰色
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="none"
+                  fill="#22c55e"
+                  fillOpacity={0.25}
+                  isAnimationActive={false}
+                  baseValue={INITIAL_CAPITAL}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="none"
+                  fill="#ef4444"
+                  fillOpacity={0.25}
+                  isAnimationActive={false}
+                  baseValue={INITIAL_CAPITAL}
+                />
+                <Tooltip content={<CustomTooltip />} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+
+
+
+          {/* === 注文パネル === */}
+          <div
+            style={{
+              marginTop: "0.5rem",
+              borderTop: "1px solid rgb(55, 65, 81)",
+              paddingTop: "1rem",
+              flexShrink: 0,
+            }}
+          >
+            <h2 className="text-lg font-semibold mb-2">🛒 注文パネル</h2>
+            <p className="mb-2">
+              対象:{" "}
+              <span className="font-bold text-yellow-300 text-xl">
+                {TICKER_DISPLAY_NAME[selectedTicker]}
+              </span>
+            </p>
+
+            {(() => {
+              const currentPrice = latestPrices[selectedTicker];
+              const maxTradableQty =
+                currentPrice && currentPrice > 0
+                  ? Math.floor((player?.cash ?? 0) / currentPrice)
+                  : 0;
+              const fmt0 = { maximumFractionDigits: 0 } as const;
+              const pos = player.holdings[selectedTicker];
+              return (
+                <>
+                  <p className="text-sm text-gray-400">
+                    保有: {pos.qty}株 @ {pos.avgPrice.toFixed(1)}
+                  </p>
+                  <p className="text-sm text-gray-400">
+                    最大 (新規):{" "}
+                    {maxTradableQty.toLocaleString(undefined, fmt0)} 株まで
+                  </p>
+                </>
+              );
+            })()}
+
             <input
               type="number"
               placeholder="数量"
-              value={partialQty}
-              onChange={(e) => setPartialQty(e.target.value)}
-              min={1}
-              max={Math.abs(closeModal.qty)}
-              className="rounded w-full mb-3"
+              className="rounded w-full mb-2 mt-2"
               style={{
                 color: "white",
                 background: "rgb(55, 65, 81)",
                 border: "1px solid rgb(75, 85, 99)",
                 padding: "0.5rem",
               }}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
             />
-
-            {/* ボタン類 */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setCloseModal(null);
-                  setPartialQty("");
-                }}
-                className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg"
+                onClick={() => order("buy")}
+                className="flex-1 bg-green-600 hover:bg-green-700 rounded py-2 font-bold"
               >
-                キャンセル
+                買い (LONG)
               </button>
-
               <button
-                onClick={() => {
-                  const qtyToClose = Number(partialQty);
-                  if (qtyToClose > 0 && qtyToClose <= Math.abs(closeModal.qty)) {
-                    handleClose(qtyToClose);
-                    setCloseModal(null);
-                    setPartialQty("");
-                  } else {
-                    alert("数量が正しくありません。");
-                  }
-                }}
-                className="bg-yellow-600 hover:bg-yellow-700 text-black px-4 py-2 rounded-lg font-bold"
+                onClick={() => order("sell")}
+                className="flex-1 bg-red-600 hover:bg-red-700 rounded py-2 font-bold"
               >
-                一部決済
+                売り (SHORT)
               </button>
             </div>
           </div>
+
+          {/* === 保有銘柄一覧（右全体スクロールに合わせて overflow は付けない） === */}
+          <div
+            style={{
+              marginTop: "1rem",
+              borderTop: "1px solid rgb(55, 65, 81)",
+              paddingTop: "1rem",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            <h2 className="text-lg font-semibold mb-2">📦 保有銘柄</h2>
+            {Object.entries(player.holdings)
+              .filter(([_, pos]) => !!pos.qty)
+              .map(([ticker, pos]) => {
+                const tickerId = ticker as TickerId;
+                const px = latestPrices[tickerId] ?? 0;
+                const pnl = (px - pos.avgPrice) * pos.qty;
+                const fmt0 = { maximumFractionDigits: 0 } as const;
+
+                return (
+                  <div
+                    key={tickerId}
+                    style={{
+                      background: "rgb(55, 65, 81)",
+                      padding: "0.75rem",
+                      borderRadius: "0.5rem",
+                      border: "1px solid rgb(75, 85, 99)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "0.25rem",
+                      }}
+                    >
+                      <span className="font-bold text-lg text-yellow-300">
+                        {TICKER_DISPLAY_NAME[tickerId]}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setCloseModal({ ticker: tickerId, qty: pos.qty });
+                          setPartialQty("");
+                        }}
+                        className="bg-yellow-600 hover:bg-yellow-700 text-black text-sm font-bold px-3 py-1 rounded"
+                      >
+                        決済
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "0.875rem",
+                      }}
+                    >
+                      <span
+                        className={pos.qty > 0 ? "text-green-400" : "text-red-400"}
+                      >
+                        {pos.qty > 0 ? "ロング" : "ショート"}:{" "}
+                        {Math.abs(pos.qty)}株
+                      </span>
+                      <span>@ {pos.avgPrice.toFixed(1)}</span>
+                    </div>
+
+                    <div style={{ textAlign: "right", marginTop: "0.25rem" }}>
+                      <span className="text-sm">評価損益: </span>
+                      <span
+                        className={pnl >= 0 ? "text-green-400" : "text-red-400"}
+                        style={{ fontWeight: "bold" }}
+                      >
+                        ¥{pnl.toLocaleString(undefined, fmt0)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       </div>
-    )}
+      
+      {/* --- 決済モーダル --- */}
+      {closeModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0, 0, 0, 0.6)",
+            backdropFilter: "blur(4px)",
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: "rgb(31, 41, 55)",
+              color: "white",
+              padding: "1.5rem",
+              borderRadius: "0.75rem",
+              boxShadow:
+                "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+              width: "400px",
+              border: "1px solid rgb(75, 85, 99)",
+            }}
+          >
+            {/* タイトル */}
+            <h2 className="text-xl font-bold mb-3">
+              {TICKER_DISPLAY_NAME[closeModal.ticker]} のポジションを決済
+            </h2>
+
+            {/* 現在ポジション */}
+            <div className="text-lg mb-4">
+              現在：
+              <span
+                className={closeModal.qty > 0 ? "text-green-400" : "text-red-400"}
+              >
+                {closeModal.qty > 0 ? "LONG " : "SHORT "}
+                {Math.abs(closeModal.qty)}株
+              </span>
+            </div>
+
+            {/* ✅ すべて決済（数量入力不要） */}
+            <button
+              onClick={() => {
+                handleClose(Math.abs(closeModal.qty));
+                setCloseModal(null);
+                setPartialQty("");
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg text-lg mb-4"
+            >
+              すべて決済
+            </button>
+
+            {/* ✅ 一部決済 */}
+            <div style={{ borderTop: "1px solid rgb(55, 65, 81)", paddingTop: "1rem" }}>
+              <p className="text-sm mb-2">一部決済する数量を入力 (最大: {Math.abs(closeModal.qty)})</p>
+              <input
+                type="number"
+                placeholder="数量"
+                value={partialQty}
+                onChange={(e) => setPartialQty(e.target.value)}
+                min={1}
+                max={Math.abs(closeModal.qty)}
+                className="rounded w-full mb-3"
+                style={{
+                  color: "white",
+                  background: "rgb(55, 65, 81)",
+                  border: "1px solid rgb(75, 85, 99)",
+                  padding: "0.5rem",
+                }}
+              />
+
+              {/* ボタン類 */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+                <button
+                  onClick={() => {
+                    setCloseModal(null);
+                    setPartialQty("");
+                  }}
+                  className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={() => {
+                    const qtyToClose = Number(partialQty);
+                    if (qtyToClose > 0 && qtyToClose <= Math.abs(closeModal.qty)) {
+                      handleClose(qtyToClose);
+                      setCloseModal(null);
+                      setPartialQty("");
+                    } else {
+                      alert("数量が正しくありません。");
+                    }
+                  }}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-black px-4 py-2 rounded-lg font-bold"
+                >
+                  一部決済
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
 
 
-    {/* ✅ ← ここを忘れるとニュースが出ない */}
-    {newsPopup && (
-      <NewsModal
-        ev={newsPopup}
-        onClose={() => setNewsPopup(null)}
-      />
-    )}
-  </div>
-);
+      {/* ✅ ← ここを忘れるとニュースが出ない */}
+      {newsPopup && (
+        <NewsModal
+          ev={newsPopup}
+          onClose={() => setNewsPopup(null)}
+        />
+      )}
+    </div>
+  );
+}
 
-} //export default function GameScreen(190行目あたり)のかっこ
