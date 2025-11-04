@@ -1,46 +1,60 @@
-// server.ts (Complete, Reset-safe, Cloud Run ready)
-
 import express, { Request, Response } from "express";
 import * as http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 
-// --- Core game logic ---
+// --- ★ リファクタリング: Core game logic ---
 import { state, updatePrices } from "./src/core/events";
 import { trade, getPlayerInfo, players } from "./src/core/trading";
-import { INIT_PRICE, TICKER_ORDER } from "./src/core/constants";
+// ★ リファクタリング: TICKERS, TickerId をインポート
+import { INIT_PRICE, TICKERS, TickerId } from "./src/core/constants";
 
-// If your events.ts exports more fields later, adjust here.
-// We assume: state = { prices: Record<string, number[]>, popup: any, newsLog: any[], running: boolean }
 type GameState = typeof state;
 
 // ------------------------------------
-// Server bootstrap
+// ★ リファクタリング: CORS設定
 // ------------------------------------
+const allowedOrigins = [
+  'https://trading-festival.web.app', // ★ あなたの本番フロントエンドURL
+  'http://localhost:5173'             // ローカルテスト用
+];
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
+};
+
 const app = express();
-app.use(cors({ origin: "*", methods: ["GET", "POST", "OPTIONS"] }));
+app.use(cors(corsOptions)); // ★ 修正: corsOptions を適用
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+const io = new Server(server, { 
+  cors: { 
+    origin: allowedOrigins, // ★ 修正: Socket.IOにも適用
+    methods: ['GET', 'POST'],
+  } 
+});
 
 // ------------------------------------
 // Socket.IO
 // ------------------------------------
 io.on("connection", (socket) => {
   console.log(`[Socket.IO] connected: ${socket.id}`);
-
   socket.on("disconnect", () => {
     console.log(`[Socket.IO] disconnected: ${socket.id}`);
   });
 });
 
-// Helper: push players snapshot (useful after trades/reset)
 function broadcastPlayers() {
   io.emit("players:update", players);
 }
-
-// Helper: push game state/tick
 function broadcastTick() {
   io.emit("game:tick", state);
 }
@@ -60,18 +74,14 @@ function startGameLoop(tickMs = 3000) {
 
   gameInterval = setInterval(() => {
     try {
-      // 1) tick prices
       updatePrices();
-
-      // 2) broadcast state
       broadcastTick();
 
-      // 3) popup/news
       if ((state as GameState).popup) {
         const p = (state as GameState).popup;
         console.log(`[Game] News popup: ${p?.name ?? "(no name)"}`);
         io.emit("game:news", p);
-        (state as GameState).popup = null; // consume once
+        (state as GameState).popup = null;
       }
     } catch (e: any) {
       console.error("[Game Loop Error] Stopping loop due to error:", e?.message ?? e);
@@ -90,7 +100,7 @@ function stopGameLoop() {
 }
 
 // ------------------------------------
-// Reset helpers (the core of your issue)
+// ★ リファクタリング: Reset helpers
 // ------------------------------------
 function resetPlayers() {
   console.log("[Reset] Clearing players.");
@@ -100,12 +110,11 @@ function resetPlayers() {
 function resetState() {
   console.log("[Reset] Resetting all state with INIT_PRICE.");
 
-  // すべての銘柄の初期価格を再セット
+  // ★ リファクタリング: TICKER_ORDER -> TICKERS
   state.prices = Object.fromEntries(
-    TICKER_ORDER.map(t => [t, [INIT_PRICE[t as keyof typeof INIT_PRICE]]])
-  );
+    TICKERS.map(t => [t, [INIT_PRICE[t]]])
+  ) as Record<TickerId, number[]>; // ★ 型アサーション
 
-  // イベント関連も初期化
   state.activeEvents = [];
   state.newsLog = [];
   state.popup = null;
@@ -118,11 +127,9 @@ function resetAll() {
   stopGameLoop();
   resetPlayers();
   resetState();
-
-  // Inform clients
   io.emit("game:reset");
-  broadcastPlayers(); // now empty
-  broadcastTick();    // now initial state
+  broadcastPlayers();
+  broadcastTick();
   console.log("[Reset] Completed.");
 }
 
@@ -130,35 +137,27 @@ function resetAll() {
 // REST API
 // ------------------------------------
 
-// Health checks
 app.get("/", (_req: Request, res: Response) => {
-  res
-    .status(200)
-    .send(
-      `<h1>Trading Festival Game Server</h1><p>Socket.IO running. PID=${process.pid}</p>`
-    );
+  res.status(200).send(`<h1>Trading Festival Game Server</h1><p>Socket.IO running. PID=${process.pid}</p>`);
 });
 
 app.get("/healthz", (_req: Request, res: Response) => {
   res.status(200).json({ ok: true, running: state.running, players: Object.keys(players).length });
 });
 
-// Game start
 app.post("/game/start", (_req: Request, res: Response) => {
   console.log("[GameMaster] start requested");
-  startGameLoop(3000); // adjust tick if you want
+  startGameLoop(3000);
   io.emit("game:start");
   res.status(200).json({ message: "Game Started" });
 });
 
-// Game reset (stop loop + clear all)
 app.post("/game/reset", (_req: Request, res: Response) => {
   console.log("[GameMaster] reset requested");
   resetAll();
   res.status(200).json({ message: "Game Reset" });
 });
 
-// Optional: explicit stop without clearing state
 app.post("/game/stop", (_req: Request, res: Response) => {
   console.log("[GameMaster] stop requested");
   stopGameLoop();
@@ -166,12 +165,12 @@ app.post("/game/stop", (_req: Request, res: Response) => {
   res.status(200).json({ message: "Game Stopped" });
 });
 
-// Admin: list all players (snapshot)
+// Admin: list all players
 app.get("/game/players", (_req: Request, res: Response) => {
   try {
     const list = Object.entries(players).map(([id, p]) => ({
       id,
-      name: id, // (MVP) If you later store displayName, swap it here.
+      name: id, 
       cash: p.cash,
       holdings: p.holdings,
       pnl: p.pnl,
@@ -196,15 +195,24 @@ app.get("/api/player/:id", (req: Request, res: Response) => {
   }
 });
 
-// Player: trade
+// ★ リファクタリング: Player: trade
+// ------------------------------------
+// TickerId 型ガード
+const isValidTicker = (t: any): t is TickerId => TICKERS.includes(t);
+
 app.post("/api/trade", (req: Request, res: Response) => {
   try {
     const { player_id, ticker, side, quantity } = req.body ?? {};
-    if (!player_id || !ticker || !side || quantity == null) {
-      return res.status(400).json({ error: "missing parameters" });
+    
+    // ★ 修正: ticker が TickerId であることを検証
+    if (!player_id || !isValidTicker(ticker) || !side || quantity == null) {
+      return res.status(400).json({ error: "missing or invalid parameters" });
     }
-    const updated = trade(String(player_id), String(ticker), side, Number(quantity));
-    broadcastPlayers(); // push whole book so admin view updates instantly
+    
+    // ★ 修正: trade 関数は TickerId を受け取る
+    const updated = trade(String(player_id), ticker, side, Number(quantity));
+    
+    broadcastPlayers(); 
     res.status(200).json(updated);
   } catch (e: any) {
     console.error("[Trade API] error:", e?.message ?? e);
@@ -234,3 +242,4 @@ process.on("SIGTERM", () => {
     process.exit(0);
   });
 });
+

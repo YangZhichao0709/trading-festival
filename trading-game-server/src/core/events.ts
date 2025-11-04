@@ -1,123 +1,145 @@
-import { 
-  TICKERS, 
-  TickerId, 
-  INIT_PRICE, 
-  SIGMA, 
-  EVENTS 
-} from "./constants";
+// ★ 修正: EVENTS も constants からインポート
+import { TICKERS, TickerId, SIGMA, INIT_PRICE, EVENTS } from "./constants";
 
-// ---------- 型定義 ----------
+// --- 型定義 (より厳格化) ---
 type PriceState = Record<TickerId, number[]>;
-type EventData = { name: string; ticker: TickerId; a: number; k: number; tick: number };
+// ★ 修正: Event型も constants の EVENTS から推論させる
+type EventConst = typeof EVENTS[number];
+type EventData = EventConst & { tick: number }; // イベントの実行時データ
 type NewsLog = { time: string; name: string; ticker: TickerId };
 
-// ---------- ゲーム状態 ----------
+// --- ゲームの全体状態 ---
 export const state: {
   prices: PriceState;
   activeEvents: EventData[];
-  popup: (EventData & { tick: 0 }) | null;
+  popup: (EventConst & { tick: 0 }) | null; // ★ 型を修正
   newsLog: NewsLog[];
   running: boolean;
 } = {
   prices: Object.fromEntries(
-    TICKERS.map(id => [id, [INIT_PRICE[id]]])
+    TICKERS.map(t => [t, [INIT_PRICE[t]]])
   ) as PriceState,
   activeEvents: [],
   popup: null,
   newsLog: [],
-  running: false
+  running: false 
 };
 
-// ---------- 正規乱数 ----------
-const randn = () => {
+/**
+ * 正規乱数（Box-Muller法）
+ */
+function randn(): number {
   let u = 0, v = 0;
   while (u === 0) u = Math.random();
   while (v === 0) v = Math.random();
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-};
+}
 
-// ---------- イベント影響 ----------
-const eventEffect = (a: number, k: number, x: number) =>
-  x > 10 ? 0 : k * (x / a) * Math.exp(-x / a);
+/**
+ * イベント効果（指数関数的減衰）
+ */
+function eventEffect(a: number, k: number, x: number): number {
+  return x > 10 ? 0 : k * (x / a) * Math.exp(-x / a);
+}
 
-// ---------- 価格更新ロジック ----------
+/**
+ * 価格を1ティック更新
+ */
 export function updatePrices(): void {
   const p = state.prices;
 
-  // ランダムノイズ
-  const rand: Record<TickerId, number> = {} as any;
+  // --- ランダムノイズ ---
+  const rand: Record<string, number> = {};
   for (const t of TICKERS) {
-    rand[t] = randn() * SIGMA[t];
+    if (t !== "NIKKEI") {
+      rand[t] = randn() * (SIGMA[t] || 0.02);
+    }
   }
 
-  // イベント発生
-  const event_r: Record<TickerId, number> = Object.fromEntries(
-    TICKERS.map(id => [id, 0])
-  ) as Record<TickerId, number>;
-
+  // --- イベント発生 ---
+  const event_r: Record<string, number> = Object.fromEntries(TICKERS.map(t => [t, 0]));
   if (Math.random() < 0.1) {
     const randomEvent = EVENTS[Math.floor(Math.random() * EVENTS.length)];
     if (randomEvent) {
-      const e: EventData = { ...randomEvent, tick: 0 };
+      const e: EventConst & { tick: 0 } = { ...randomEvent, tick: 0 as const };
+      
+      // ★ 修正: TS2322 (型推論) エラーの解決
+      // `popup` (狭い型) への代入を *先* に行う
       state.popup = e;
-      state.activeEvents.push(e);
+      // `activeEvents` (広い型) への push を *後* に行う
+      state.activeEvents.push(e); 
 
+      const now = new Date().toLocaleTimeString("ja-JP", { hour12: false });
       state.newsLog.push({
-        time: new Date().toLocaleTimeString("ja-JP", { hour12: false }),
+        time: now,
         name: e.name,
         ticker: e.ticker
       });
     }
   }
 
-  // イベントの時間経過
+  // --- イベント経過処理 ---
   for (let i = state.activeEvents.length - 1; i >= 0; i--) {
+    // ★ 修正: 'ev' が undefined でないことを確認 (TS18048)
     const ev = state.activeEvents[i];
-    ev.tick++;
-    if (ev.tick > 10) {
+    if (!ev) continue; // ガード節
+
+    ev.tick++; // TS18048 解消
+    if (ev.tick > 10) { // TS18048 解消
       state.activeEvents.splice(i, 1);
       continue;
     }
-    event_r[ev.ticker] += eventEffect(ev.a, ev.k, ev.tick);
+
+    const eff = eventEffect(ev.a, ev.k, ev.tick); // TS18048 解消
+    const ticker = ev.ticker;
+    if (Object.prototype.hasOwnProperty.call(event_r, ticker)) {
+      event_r[ticker] = (event_r[ticker] ?? 0) + eff;
+    }
   }
 
-  // 相互依存の計算用（USDJPY → 為替影響）
-  const fxChange = rand["USDJPY"] + event_r["USDJPY"];
+  // --- 相互依存ロジック ---
+  const fxChange = (rand["USDJPY"] ?? 0) + (event_r["USDJPY"] ?? 0);
 
-  // 各ティッカーの変化率
-  const r_total: Record<TickerId, number> = {} as any;
+  const r_total: Record<string, number> = {};
   for (const t of TICKERS) {
-    let base = rand[t] + event_r[t];
+    if (t === "NIKKEI") continue;
+    const base = (rand[t] ?? 0) + (event_r[t] ?? 0);
 
     if (t === "BANK") {
       r_total[t] = base;
-    } 
-    else if (["AUTO","SEMI","NITORI","NINTENDO","ENEOS"].includes(t)) {
-      const weight: Record<TickerId, number> = {
-        AUTO: 0.6, SEMI: 0.4, NITORI: -0.2, NINTENDO: 0.3, ENEOS: 0.2,
-        BANK:0,PHARMA:0,UTIL:0,AIR:0,GOLD:0,USDJPY:0,NIKKEI:0
+    } else if (["AUTO", "SEMI", "NITORI", "NINTENDO", "ENEOS"].includes(t)) {
+      const weight: Partial<Record<TickerId, number>> = {
+        "AUTO": 0.6, "SEMI": 0.4, "NITORI": -0.2, "NINTENDO": 0.3, "ENEOS": 0.2
       };
-      r_total[t] = base + fxChange * weight[t];
-    } 
-    else if (t === "AIR" || t === "UTIL") {
-      const ene = rand["ENEOS"] + event_r["ENEOS"];
-      r_total[t] = base + ene * (t === "AIR" ? -0.6 : -0.3);
-    } 
-    else {
+      r_total[t] = base + fxChange * (weight[t] || 0);
+    } else if (["AIR", "UTIL"].includes(t)) {
+      const eneosChange = (rand["ENEOS"] ?? 0) + (event_r["ENEOS"] ?? 0);
+      const w = t === "AIR" ? -0.6 : -0.3;
+      r_total[t] = base + eneosChange * w;
+    } else {
       r_total[t] = base;
     }
   }
 
-  // 日経平均（他ティッカーの単純平均とする）
-  const idxTargets: TickerId[] = ["BANK","SEMI","AUTO","PHARMA","NITORI","UTIL","AIR","NINTENDO","ENEOS"];
+  // --- 日経平均 ---
+  const non_macro: TickerId[] = [
+    "BANK", "SEMI", "AUTO", "PHARMA",
+    "NITORI", "UTIL", "AIR", "NINTENDO", "ENEOS"
+  ];
   r_total["NIKKEI"] =
-    idxTargets.reduce((s, t) => s + r_total[t], 0) / idxTargets.length;
+    non_macro.reduce((sum, t) => sum + (r_total[t] ?? 0), 0) / non_macro.length;
 
-  // 価格反映
+  // --- 最終価格更新 ---
   for (const t of TICKERS) {
-    const arr = p[t];
-    const last = arr[arr.length - 1];
-    const next = last * (1 + r_total[t]);
-    arr.push(Math.max(0.001, next));
+    const priceArray = p[t];
+    if (!priceArray || priceArray.length === 0) continue;
+
+    // ★ 修正: 'last' が undefined でないことを確認 (TS18048)
+    const last = priceArray[priceArray.length - 1];
+    if (typeof last !== 'number') continue; // 型ガード
+
+    const next = last * (1 + (r_total[t] || 0));
+    priceArray.push(Math.max(0.001, next));
   }
 }
+
