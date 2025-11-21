@@ -10,3 +10,8 @@ export const API_BASE =
 //localhostかどうかで判別してるので、普通にデプロイするだけで通る
 //server deploy: gcloud run deploy trading-game-server --source . --region asia-northeast1 --allow-unauthenticated --project=trading-festival
 //client deploy 1)npm run build 2)firebase deploy --only hosting
+
+//gitの手順
+//git add .
+//git commit -m "変更内容をここに書く"
+//git push

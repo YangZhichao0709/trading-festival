@@ -50,8 +50,11 @@ function App() {
   // 1. プレイヤー名がまだ入力されていない場合
   if (playerName === null) {
     return (
-      <UserNameModal 
-        onConfirm={(name) => setPlayerName(name)} 
+      <UserNameModal
+        onConfirm={(name) => {
+          setPlayerName(name);       // ← 状態に保存
+          socket.emit("player:join", name); // ← ★ ここでサーバーへ通知！
+        }}
       />
     );
   }

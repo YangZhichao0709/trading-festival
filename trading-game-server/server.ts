@@ -3,20 +3,26 @@ import * as http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 
-// --- ★ リファクタリング: Core game logic ---
-import { state, updatePrices } from "./src/core/events";
+import { state, updatePrices, triggerEventById } from "./src/core/events";
 import { trade, getPlayerInfo, players } from "./src/core/trading";
-// ★ リファクタリング: TICKERS, TickerId をインポート
-import { INIT_PRICE, TICKERS, TickerId } from "./src/core/constants";
+import {
+  INIT_PRICE,
+  TICKERS,
+  TickerId,
+  BUSINESS_DAYS_2026,
+  STORY_ROUTES,
+  RANDOM_EVENT_PROB,
+  EVENTS,
+} from "./src/core/constants";
 
 type GameState = typeof state;
 
 // ------------------------------------
-// ★ リファクタリング: CORS設定
+// CORS設定
 // ------------------------------------
 const allowedOrigins = [
-  'https://trading-festival.web.app', // ★ あなたの本番フロントエンドURL
-  'http://localhost:5173'             // ローカルテスト用
+  'https://trading-festival.web.app', // 本番フロントエンド
+  'http://localhost:5173'             // ローカル開発用
 ];
 
 const corsOptions: cors.CorsOptions = {
@@ -31,15 +37,15 @@ const corsOptions: cors.CorsOptions = {
 };
 
 const app = express();
-app.use(cors(corsOptions)); // ★ 修正: corsOptions を適用
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = new Server(server, { 
-  cors: { 
-    origin: allowedOrigins, // ★ 修正: Socket.IOにも適用
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
-  } 
+  }
 });
 
 // ------------------------------------
@@ -47,6 +53,24 @@ const io = new Server(server, {
 // ------------------------------------
 io.on("connection", (socket) => {
   console.log(`[Socket.IO] connected: ${socket.id}`);
+
+  socket.on("player:join", (name: string) => {
+    try {
+      if (!name || typeof name !== 'string' || name.trim() === '') {
+        console.warn(`[Socket.IO] "player:join" への不正な名前です: ${name}`);
+        return;
+      }
+
+      const playerName = name.trim();
+      console.log(`[Socket.IO] "player:join" を受信しました: ${playerName}`);
+      getPlayerInfo(playerName);
+      broadcastPlayers();
+
+    } catch (e: any) {
+      console.error(`[Socket.IO] "player:join" ( ${name} ) の処理中にエラー:`, e?.message ?? e);
+    }
+  });
+
   socket.on("disconnect", () => {
     console.log(`[Socket.IO] disconnected: ${socket.id}`);
   });
@@ -60,29 +84,111 @@ function broadcastTick() {
 }
 
 // ------------------------------------
-// Game loop control
+// Game loop control (ストーリーモード対応)
 // ------------------------------------
 let gameInterval: NodeJS.Timeout | null = null;
+let currentBusinessDayIndex = 0; // 営業日計算用
+
+// ★ ストーリーモード管理用変数
+let currentStoryRoute: (typeof STORY_ROUTES[keyof typeof STORY_ROUTES]) | null = null;
+let randomEventIds: string[] = []; // ランダムイベント専用のIDリスト
+
+/**
+ * ストーリーとランダムイベントリストを選択・初期化する関数
+ */
+function selectStoryRoute() {
+  // 1. ストーリーをランダムに選択
+  const routeKeys = Object.keys(STORY_ROUTES) as (keyof typeof STORY_ROUTES)[];
+  
+  // ★ 修正: 末尾に ! を追加 (配列アクセスが undefined にならないことを明示)
+  const randomKey = routeKeys[Math.floor(Math.random() * routeKeys.length)]!;
+  
+  currentStoryRoute = STORY_ROUTES[randomKey];
+  console.log(`[Game] Story route selected: ${randomKey}`);
+
+  // 2. ランダムイベント候補をフィルタリング
+  const randomStartIndex = EVENTS.findIndex(e => e.id === "rating_bank_up");
+  
+  if (randomStartIndex === -1) {
+    console.warn("[Game] Could not find start of random events ('rating_bank_up'). Using fallback.");
+    randomEventIds = [];
+  } else {
+    randomEventIds = EVENTS.slice(randomStartIndex).map(e => e.id);
+  }
+  console.log(`[Game] ${randomEventIds.length} random-only events loaded.`);
+}
 
 function startGameLoop(tickMs = 3000) {
   if (gameInterval) {
     console.log("[Game] Loop already running. Skip starting.");
     return;
   }
+
+  // ★ ゲーム開始時にストーリーが未選択なら選択する
+  if (!currentStoryRoute) {
+    selectStoryRoute();
+  }
+
   console.log("[Game] Starting game loop.");
   state.running = true;
 
   gameInterval = setInterval(() => {
     try {
+      currentBusinessDayIndex++; // 営業日進行
+
+      // ゲーム終了判定
+      if (currentBusinessDayIndex >= BUSINESS_DAYS_2026.length) {
+        console.log("[Game] Final business day reached. Ending game.");
+        stopGameLoop();
+        io.emit("game:end");   // フロントへ終了通知
+        return;
+      }
+
+      // 現在の日付を通知
+      broadcastGameDate();
+
+      // ★★★ イベント発生ロジック (ストーリー優先) ★★★
+      if (currentStoryRoute) {
+        // 1. 今日の日付に設定されているストーリーイベントを探す
+        const storyEvent = currentStoryRoute.find(
+          (e) => e.dayIndex === currentBusinessDayIndex
+        );
+
+        if (storyEvent) {
+          // ストーリーイベントがあれば発生させる
+          console.log(`[Story] Day ${currentBusinessDayIndex}: Triggering ${storyEvent.eventId}`);
+          triggerEventById(storyEvent.eventId);
+        } else {
+          // 2. ストーリーが無い日 → ランダムイベントの抽選
+          if (Math.random() < RANDOM_EVENT_PROB && randomEventIds.length > 0) {
+            // ★ 修正: 末尾に ! を追加
+            const randomId = randomEventIds[Math.floor(Math.random() * randomEventIds.length)]!;
+            
+            console.log(`[Random] Day ${currentBusinessDayIndex}: Triggering ${randomId}`);
+            triggerEventById(randomId);
+          }
+        }
+      }
+
+      // 価格更新 (ノイズ計算 + 発生中イベントの消化)
       updatePrices();
+
+      // プレイヤー情報の更新
+      for (const name of Object.keys(players)) {
+        getPlayerInfo(name);
+      }
+
+      broadcastPlayers();
       broadcastTick();
 
-      if ((state as GameState).popup) {
-        const p = (state as GameState).popup;
-        console.log(`[Game] News popup: ${p?.name ?? "(no name)"}`);
-        io.emit("game:news", p);
+      // ニュース処理: triggerEventById で state.popup がセットされていれば配信
+      const popup = (state as GameState).popup;
+      if (popup && popup.eventDefinition) {
+        // クライアントへ送信 (eventDefinition は k が数値解決済み)
+        io.emit("game:news", popup.eventDefinition);
         (state as GameState).popup = null;
       }
+
     } catch (e: any) {
       console.error("[Game Loop Error] Stopping loop due to error:", e?.message ?? e);
       stopGameLoop();
@@ -99,9 +205,23 @@ function stopGameLoop() {
   state.running = false;
 }
 
-// ------------------------------------
-// ★ リファクタリング: Reset helpers
-// ------------------------------------
+
+function broadcastGameDate() {
+  const dateString = BUSINESS_DAYS_2026[currentBusinessDayIndex];
+
+  // JST 9時固定の UNIX 秒に変換
+  const unixSec = Math.floor(
+    new Date(dateString + "T09:00:00+09:00").getTime() / 1000
+  );
+
+  io.emit("game:date", {
+    unix: unixSec,
+    index: currentBusinessDayIndex,
+    remaining: BUSINESS_DAYS_2026.length - currentBusinessDayIndex - 1,
+  });
+}
+
+
 function resetPlayers() {
   console.log("[Reset] Clearing players.");
   for (const k of Object.keys(players)) delete players[k];
@@ -110,10 +230,9 @@ function resetPlayers() {
 function resetState() {
   console.log("[Reset] Resetting all state with INIT_PRICE.");
 
-  // ★ リファクタリング: TICKER_ORDER -> TICKERS
   state.prices = Object.fromEntries(
     TICKERS.map(t => [t, [INIT_PRICE[t]]])
-  ) as Record<TickerId, number[]>; // ★ 型アサーション
+  ) as Record<TickerId, number[]>;
 
   state.activeEvents = [];
   state.newsLog = [];
@@ -127,6 +246,12 @@ function resetAll() {
   stopGameLoop();
   resetPlayers();
   resetState();
+  currentBusinessDayIndex = 0;
+
+  // ★ ストーリーとランダムイベントリストをリセット (次回start時に再抽選)
+  currentStoryRoute = null;
+  randomEventIds = [];
+
   io.emit("game:reset");
   broadcastPlayers();
   broadcastTick();
@@ -170,7 +295,7 @@ app.get("/game/players", (_req: Request, res: Response) => {
   try {
     const list = Object.entries(players).map(([id, p]) => ({
       id,
-      name: id, 
+      name: id,
       cash: p.cash,
       holdings: p.holdings,
       pnl: p.pnl,
@@ -195,24 +320,21 @@ app.get("/api/player/:id", (req: Request, res: Response) => {
   }
 });
 
-// ★ リファクタリング: Player: trade
-// ------------------------------------
+// Player: trade
 // TickerId 型ガード
 const isValidTicker = (t: any): t is TickerId => TICKERS.includes(t);
 
 app.post("/api/trade", (req: Request, res: Response) => {
   try {
     const { player_id, ticker, side, quantity } = req.body ?? {};
-    
-    // ★ 修正: ticker が TickerId であることを検証
+
     if (!player_id || !isValidTicker(ticker) || !side || quantity == null) {
       return res.status(400).json({ error: "missing or invalid parameters" });
     }
-    
-    // ★ 修正: trade 関数は TickerId を受け取る
+
     const updated = trade(String(player_id), ticker, side, Number(quantity));
-    
-    broadcastPlayers(); 
+
+    broadcastPlayers();
     res.status(200).json(updated);
   } catch (e: any) {
     console.error("[Trade API] error:", e?.message ?? e);
@@ -243,3 +365,69 @@ process.on("SIGTERM", () => {
   });
 });
 
+//強化学習用
+// ==============================
+// RL API
+// ==============================
+
+// RL: reset environment
+app.post("/api/rl/reset", (_req, res) => {
+  try {
+    // ゲームを一旦止める
+    stopGameLoop();
+    resetAll();
+
+    // RL としての初期状態は「全てデフォルト」
+    const observation = {
+      tick: 0,
+      prices: state.prices,
+      events: [],
+    };
+
+    res.json({ ok: true, observation });
+  } catch (e: any) {
+    console.error("[RL Reset Error]", e);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// RL: step
+app.post("/api/rl/step", (req, res) => {
+  try {
+    const { ticker, side, qty } = req.body;
+
+    // 価格を1ステップ進める
+    updatePrices();
+
+    // プレイヤーIDは固定（"RL_AGENT"）
+    const player = trade("RL_AGENT", ticker, side, qty);
+
+    // 学習用 reward（資産増加）
+    const reward = player.totalValue - 100_000_000;
+
+    // 次の観測
+    const observation = {
+      tick: state.prices["BANK"].length - 1,
+      prices: state.prices,
+      events: state.activeEvents.map(e => e.eventDefinition.id),
+    };
+
+    res.json({
+      ok: true,
+      observation,
+      reward,
+      done: false
+    });
+  } catch (e: any) {
+    console.error("[RL Step Error]", e);
+    res.status(500).json({ ok: false });
+  }
+});
+
+// RL: get state
+app.get("/api/rl/state", (_req, res) => {
+  res.json({
+    ok: true,
+    state,
+  });
+});

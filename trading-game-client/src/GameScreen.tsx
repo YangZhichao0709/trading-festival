@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { socket } from "./App";
-import { API_BASE } from "./apiConfig"; // ✅ 修正点①
+import { API_BASE } from "./apiConfig";
+import { BUSINESS_DAYS_2026 } from "./constants";
 
-// lightweight-charts（個別銘柄チャート用）⬇
+// lightweight-charts(個別銘柄チャート用)
 import { createChart, CandlestickSeries } from "lightweight-charts";
 import type {
   IChartApi,
@@ -12,7 +13,7 @@ import type {
   UTCTimestamp,
 } from "lightweight-charts";
 
-// ✅ 資産グラフ用ライブラリ（Recharts）
+// 資産グラフ用ライブラリ(Recharts)
 import {
   AreaChart,
   Area,
@@ -22,9 +23,13 @@ import {
   ReferenceLine,
   Tooltip,
   ResponsiveContainer,
+  PieChart,
+  Pie,    
+  Cell, 
+  Legend   
 } from "recharts";
 
-// ★ 修正: 値と型を分けてインポート
+// 値と型を分けてインポート
 import {
   TICKERS,
   TICKER_DISPLAY_NAME,
@@ -38,7 +43,9 @@ import type {
   Position
 } from "./constants"; 
 
-// --- ローソク足に変換する関数 (変更なし) ---
+import GameEndModal from "./GameEndModal";
+
+// --- ローソク足に変換する関数 ---
 function pricesToCandles(prices: number[]): CandlestickData[] {
   if (!prices?.length) return [];
   const arr = prices.length > 120 ? prices.slice(-120) : prices;
@@ -55,70 +62,78 @@ function pricesToCandles(prices: number[]): CandlestickData[] {
 // ========== ニュースモーダル ==========
 function NewsModal({ ev, onClose }: { ev: NewsEvent; onClose: () => void }) {
   const imageUrl = NEWS_IMAGE_MAP[ev.name] || DEFAULT_NEWS_IMAGE;
+  
+  const affectedTickers = ev.tickers
+    .map(t => TICKER_DISPLAY_NAME[t.ticker as TickerId] || t.ticker)
+    .join('、 '); // 「、」で連結
+
   return createPortal(
     <div style={{
-      position: "fixed", inset: 0,
-      background: "rgba(128,128,128,0.85)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 2147483647,
-    }}>
-      <div style={{
-        background: "rgb(31, 41, 55)", color: "white",
-        width: 500, borderRadius: "1rem",
-        position: "relative",
-        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-        border: "1px solid rgb(75, 85, 99)",
-        padding: "1.5rem",
-        display: "flex", alignItems: "center",
-      }}>
-        <button
-          onClick={onClose}
-          style={{
-            position: "absolute", top: "0.5rem", left: "0.5rem",
-            width: 32, height: 32,
-            borderRadius: "9999px",
-            background: "rgb(75,85,99)",
-            cursor: "pointer",
-          }}
-        >×</button>
-
-        <div style={{
-          width: 128, height: 128,
-          borderRadius: "0.5rem", background: "rgb(55,65,81)",
-          marginRight: "1.5rem",
-        }}>
-          <img
-            src={imageUrl}
-            alt={ev.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "0.5rem" }}
-          />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h2 style={{ textAlign: "center", marginBottom: "0.5rem" }}>📰 ニュース速報</h2>
-          <p style={{ textAlign: "center", fontWeight: "bold", marginBottom: "0.5rem" }}>{ev.name}</p>
-          <p style={{ textAlign: "center", marginBottom: "0.5rem", lineHeight: 1.6 }}>
-            {ev.description}
+      position: "fixed", inset: 0,
+      background: "rgba(128,128,128,0.85)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 2147483647,
+    }}>
+      <div style={{
+        background: "rgb(31, 41, 55)", color: "white",
+        width: 500, borderRadius: "1rem",
+        position: "relative",
+        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        border: "1px solid rgb(75, 85, 99)",
+        padding: "1.5rem",
+        display: "flex", alignItems: "center",
+      }}>
+        {/* ... (閉じるボタン) ... */}
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", top: "0.5rem", left: "0.5rem",
+            width: 32, height: 32,
+            borderRadius: "9999px",
+            background: "rgb(75,85,99)",
+            cursor: "pointer",
+          }}
+        >×</button>
+        
+        {/* ... (画像) ... */}
+        <div style={{
+          width: 128, height: 128,
+          borderRadius: "0.5rem", background: "rgb(55,65,81)",
+          marginRight: "1.5rem",
+        }}>
+          <img
+            src={imageUrl}
+            alt={ev.name}
+            style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "0.5rem" }}
+          />
+        </div>
+        
+        {/* ... (テキスト) ... */}
+        <div style={{ flex: 1 }}>
+          <h2 style={{ textAlign: "center", marginBottom: "0.5rem" }}>📰 ニュース速報</h2>
+          <p style={{ textAlign: "center", fontWeight: "bold", marginBottom: "0.5rem" }}>{ev.name}</p>
+          <p style={{ textAlign: "center", marginBottom: "0.5rem", lineHeight: 1.6 }}>
+            {ev.description}
+          </p>
+          <p style={{ textAlign: "center", fontSize: "0.875rem" }}>
+            影響銘柄：{affectedTickers}
           </p>
-          {/* ★ 修正: ev.ticker (ID) を表示名に変換 */}
-          <p style={{ textAlign: "center", fontSize: "0.875rem" }}>影響銘柄：{TICKER_DISPLAY_NAME[ev.ticker]}</p>
-        </div>
-      </div>
-    </div>,
-    document.body
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
 
-
-
 // ========== 1枚のタイル(銘柄チャート) ==========
 function ChartTile({
-  tickerId, // ★ 修正: ticker -> tickerId
+  tickerId, 
   price, holdingQty,
   registerChart,
   onSelect, selected,
 }: {
-  tickerId: TickerId; // ★ 修正: string -> TickerId
+  tickerId: TickerId;
   price?: number;
   holdingQty?: number;
   registerChart: (el: HTMLDivElement | null) => void;
@@ -150,7 +165,6 @@ function ChartTile({
         <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "rgb(134,239,172)" }}>
           {price?.toFixed(2)}
         </div>
-        {/* ★ 修正: tickerId から表示名(日本語)を引く */}
         <div style={{ fontSize: "0.875rem", fontWeight: "bold", color: "white" }}>{TICKER_DISPLAY_NAME[tickerId]}</div>
       </div>
 
@@ -171,7 +185,10 @@ function ChartTile({
   );
 }
 
-
+type ActiveEventData = {
+  tick: number;
+  eventDefinition: NewsEvent; // この中にニュース本体 (NewsEvent) が入っている
+};
 
 
 export default function GameScreen({ playerName }: { playerName: string }) {
@@ -191,48 +208,93 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   const [newsPopup, setNewsPopup] = useState<NewsEvent | null>(null);
 
   const [avgOthersHistory, setAvgOthersHistory] = useState<Array<{ time: number; value: number }>>([]); //他プレイヤーの平均用
+  const [investPct, setInvestPct] = useState(0); // 0〜100 (%)
+  const [newsLog, setNewsLog] = useState<NewsEvent[]>([]); // これはニュース履歴用
+  const [closePct, setClosePct] = useState(0); // 決済割合（0〜100）
 
   // --- 資産履歴（Recharts用） ---
   const [assetHistory, setAssetHistory] = useState<Array<{ time: number; value: number }>>([]);
   const INITIAL_CAPITAL = 100_000_000;
 
+  const COLORS = [ //円グラフ用
+    '#0088FE', // 現金 (青)
+    '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d',
+    '#ffc658', '#a4de6c', '#d0ed57', '#83a6ed', '#b15928', '#fdbf6f',
+  ];
+
   // --- チャート管理（左の12個用） ---
   const chartsRef = useRef<Record<string, IChartApi | undefined>>({})
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick"> | undefined>>({})
 
-  /** 各銘柄タイルのDOMに軽量チャートを作成 */
-  const makeRegisterChart = (ticker: TickerId) => (el: HTMLDivElement | null) => {
-    if (!el || chartsRef.current[ticker]) return;
-    const chart = createChart(el, {
-      width: el.clientWidth,
-      height: el.clientHeight,
-      layout: { background: { color: "#0f172a" }, textColor: "#e2e8f0" },
-      grid: {
-        vertLines: { color: "#1f2937" },
-        horzLines: { color: "#1f2937" },
-      },
-      rightPriceScale: { borderColor: "#485c7b" },
-      timeScale: { borderColor: "#485c7b", visible: false },
-    });
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#22c55e",
-      downColor: "#ef4444",
-      borderVisible: false,
-      wickUpColor: "#22c55e",
-      wickDownColor: "#ef4444",
-    });
-
-    chartsRef.current[ticker] = chart;
-    seriesRef.current[ticker] = candleSeries;
+  const updateQtyBasedOnPct = (newPct: number, targetTicker: TickerId) => {
+    // 1. 割合(%)を 10% 刻みのスナップされた値に正規化
+    const snappedPct = Math.round(newPct / 10) * 10;
+    
+    // 2. 割合(%)の state を更新（バーの表示に反映）
+    setInvestPct(snappedPct);
+    
+    // 3. 数量(qty)を計算して更新
+    const currentPrice = latestPrices[targetTicker] ?? 0;
+    
+    if (currentPrice > 0) {
+      // 現金 (player.cash) × 割合 (snappedPct / 100) で買える量を計算
+      const targetValue = (player.cash * snappedPct) / 100;
+      const newQty = Math.floor(targetValue / currentPrice);
+      
+      // 数量が0より大きい場合のみセット（0の場合は空欄にする）
+      setQty(newQty > 0 ? newQty.toString() : "");
+    } else {
+      // 価格が取れない場合は数量をクリア
+      setQty("");
+    }
   };
 
+  /** 各銘柄タイルのDOMに軽量チャートを作成 */
+  const makeRegisterChart = (ticker: TickerId) => (el: HTMLDivElement | null) => {
+      if (!el || chartsRef.current[ticker]) return;
+      const chart = createChart(el, {
+        width: el.clientWidth,
+        height: el.clientHeight,
+        layout: { background: { color: "#0f172a" }, textColor: "#e2e8f0" },
+        grid: {
+          vertLines: { color: "#1f2937" },
+          horzLines: { color: "#1f2937" },
+        },
+        rightPriceScale: { borderColor: "#485c7b" },
+        timeScale: { borderColor: "#485c7b", visible: false },
+      });
+      const candleSeries = chart.addSeries(CandlestickSeries, {
+        upColor: "#22c55e",
+        downColor: "#ef4444",
+        borderVisible: false,
+        wickUpColor: "#22c55e",
+        wickDownColor: "#ef4444",
+      });
+
+      chartsRef.current[ticker] = chart;
+      seriesRef.current[ticker] = candleSeries;
+    };
 
 
-  // ✅ カスタムツールチップ（資産＋損益の2行表示）
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload || !payload.length) return null;
-    const currentValue = Math.round(Number(payload[0].value));
-    const pnl = currentValue - INITIAL_CAPITAL;
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: any[];
+    label?: number;
+  }) => {
+    if (!active || !payload?.length) return null;
+
+    // ★ time(label) → index 逆引き
+    const idx = assetHistory.findIndex((d) => d.time === label);
+    if (idx === -1) return null;
+
+    const dateStr = BUSINESS_DAYS_2026[idx] ?? "";
+
+    const value = Math.round(payload[0].value);
+    const pnl = value - INITIAL_CAPITAL;
     const isPlus = pnl >= 0;
 
     return (
@@ -245,27 +307,33 @@ export default function GameScreen({ playerName }: { playerName: string }) {
           borderRadius: 6,
         }}
       >
-        <div>
-          {new Date(label * 1000).toLocaleTimeString("ja-JP", { hour12: false })}
-        </div>
-        <div style={{ color: "white" }}>
-          資産：¥{currentValue.toLocaleString()}
-        </div>
-        <div>
-          <span style={{ color: "white" }}>損益：</span>
-          <span style={{ color: isPlus ? "#22c55e" : "#ef4444" }}>
-            {isPlus ? "+" : "-"}
-            {Math.abs(pnl).toLocaleString()}
-          </span>
+        <div>{dateStr}</div>
+        <div>資産：¥{value.toLocaleString()}</div>
+        <div style={{ color: isPlus ? "#22c55e" : "#ef4444" }}>
+          損益：{isPlus ? "+" : "-"}{Math.abs(pnl).toLocaleString()}
         </div>
       </div>
     );
   };
 
-  useEffect(() => {
-    console.log("✅ avgOthersHistory =", avgOthersHistory);
-  }, [avgOthersHistory]);
 
+
+
+
+  //日付表示用
+  const [gameDate, setGameDate] = useState<number | null>(null);
+  const [remainingDays, setRemainingDays] = useState<number>(0);
+
+  useEffect(() => {
+  socket.on("game:date", ({ unix, remaining }) => {
+    setGameDate(unix);
+    setRemainingDays(remaining);
+  });
+
+  return () => {
+    socket.off("game:date");
+  };
+}, []);
 
   // --- 画面リサイズへの反応 ---
   useEffect(() => {
@@ -287,12 +355,12 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   // --- サーバーからの状態受信（価格・プレイヤー・ニュース） ---
   useEffect(() => {
     const handleGameTick = (serverState: any) => {
-      // ★ 修正: TickerId をキーにする
       const latest: Partial<Record<TickerId, number>> = {};
-      // ★ 修正: TickerId を使う
+
       for (const t of TICKERS) {
-        const prices = serverState?.prices?.[t]; // t は "BANK" など
+        const prices = serverState?.prices?.[t];
         if (!prices?.length) continue;
+
         latest[t] = prices[prices.length - 1];
 
         const s = seriesRef.current[t];
@@ -301,38 +369,58 @@ export default function GameScreen({ playerName }: { playerName: string }) {
       setLatestPrices(latest);
     };
 
-    const handleGameNews = (ev: NewsEvent) => setNewsPopup(ev);
+
+
+    const handleGameNews = (data: ActiveEventData) => {
+      console.log("Received game:news", data); // デバッグ用
+      if (data && data.eventDefinition) {
+        setNewsPopup(data.eventDefinition);
+      }
+    };
 
     const handlePlayersUpdate = (all: Record<string, Player>) => {
       const me = all[playerName];
       if (me) {
-        const recalculatedTotal =
-          me.cash +
-          Object.entries(me.holdings).reduce((sum, [ticker, pos]) => {
-            if (!pos.qty) return sum;
-            // ★ 修正: TickerId を使う
-            const px = latestPrices[ticker as TickerId] ?? pos.avgPrice;
-            return sum + px * pos.qty;
-          }, 0);
+        setPlayer(me);
 
-        setPlayer({ ...me, totalValue: recalculatedTotal });
+        const now = Math.floor(Date.now() / 1000);
+        const pv = me.totalValue; // ←100%最新の資産
+
+        setAssetHistory(prev => {
+          if (prev.length && prev[prev.length - 1].time === now) return prev;
+
+          return [
+            ...prev,
+            {
+              time: now,
+              value: pv,
+              profit: Math.max(pv, INITIAL_CAPITAL),
+              loss: Math.min(pv, INITIAL_CAPITAL)
+            }
+          ];
+        });
       }
 
-      const otherPlayers = Object.entries(all).filter(([name]) => name !== playerName);
+      // --- 他プレイヤー平均もここで計算すべき ---
+      const otherPlayers = Object.entries(all).filter(
+        ([name]) => name !== playerName
+      );
 
       if (otherPlayers.length > 0) {
-        const t = Math.floor(Date.now() / 1000);
         const avgValue =
           otherPlayers.reduce((sum, [_, pl]) => {
             return sum + (pl.totalValue ?? pl.cash);
           }, 0) / otherPlayers.length;
 
+        const now = Math.floor(Date.now() / 1000);
+
         setAvgOthersHistory(prev => {
-          if (prev.length && prev[prev.length - 1].time === t) return prev;
-          return [...prev, { time: t, value: avgValue }];
+          if (prev.length && prev[prev.length - 1].time === now) return prev;
+          return [...prev, { time: now, value: avgValue }];
         });
       }
     };
+
 
     socket.on("game:tick", handleGameTick);
     socket.on("game:news", handleGameNews);
@@ -351,42 +439,53 @@ export default function GameScreen({ playerName }: { playerName: string }) {
     };
   }, [playerName]);
 
-
-
-
-  // --- クライアント側でも、価格/保有が変わったら総資産を再計算して履歴に追記（補完用） ---
+  // ゲーム終了判定
+  const [gameOver, setGameOver] = useState(false);
+  const [gameOverReason, setGameOverReason] = useState<"end" | "bankrupt" | null>(null);
+  
+// ニュース履歴用
   useEffect(() => {
-    const now = Math.floor(Date.now() / 1000);
+    const handler = (ev: NewsEvent) => {
+      // ★ 破産 or ゲーム終了中はニュース無視
+      if (gameOver) return;
 
-    const totalValue =
-      (player?.cash ?? 0) +
-      Object.entries(player.holdings).reduce((sum, [ticker, pos]) => {
-        if (!pos.qty) return sum;
-        // ★ 修正: TickerId を使う
-        const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
-        return sum + px * pos.qty;
-      }, 0);
+      setNewsPopup(ev);
+      setNewsLog(prev => [ev, ...prev].slice(0, 30));
+    };
 
-    setAssetHistory(prev => {
-      if (prev.length && prev[prev.length - 1].time === now) return prev;
-      return [
-        ...prev,
-        {
-          time: now,
-          value: totalValue,
-          profit: Math.max(totalValue, INITIAL_CAPITAL), // 基準線より上だけ
-          loss:   Math.min(totalValue, INITIAL_CAPITAL), // 基準線より下だけ
-        },
-      ];
-    });
-  }, [latestPrices, player]);
+    socket.on("game:news", handler);
+
+    return () => {
+      socket.off("game:news", handler);
+    };
+  }, [gameOver]);
+
+
+  useEffect(() => {
+    const handler = () => {
+      setGameOver(true);
+      setGameOverReason("end");
+    };
+
+    socket.on("game:end", handler);
+
+    return () => {
+      socket.off("game:end", handler);
+    };
+  }, []);
+  
+  useEffect(() => {
+  if (!gameOver && player.totalValue <= 0) {
+    setGameOver(true);
+    setGameOverReason("bankrupt");
+  }
+}, [player.totalValue]);
 
 
 
 
   
   // --- 注文まわり ---
-  // ★ 修正: TickerId を使う
   const order = async (side: "buy" | "sell", customTicker?: TickerId, customQty?: number) => {
     const ticker = customTicker || selectedTicker;
     const quantity = customQty ?? Number(qty);
@@ -396,7 +495,6 @@ export default function GameScreen({ playerName }: { playerName: string }) {
       const res = await fetch(`${API_BASE}/api/trade`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // ★ 修正: TickerId を送信
         body: JSON.stringify({ player_id: playerName, ticker, side, quantity }),
       });
       const data = await res.json();
@@ -416,8 +514,29 @@ export default function GameScreen({ playerName }: { playerName: string }) {
     setCloseModal(null);
   };
 
-  // ★ 修正: TickerId を使う
-  //const currentPosition = player.holdings[selectedTicker] || { qty: 0, avgPrice: 0 };
+  const pieData = [
+    // 1. 現金
+    {
+      name: "現金",
+      value: Math.round(player.cash), // 整数に丸める
+    },
+    // 2. 保有銘柄 (ロング・ショートの区別なく、評価額の絶対値)
+    ...Object.entries(player.holdings)
+      .filter(([_, pos]) => pos.qty !== 0) // 数量0は除外
+      .map(([ticker, pos]) => {
+        const tickerId = ticker as TickerId;
+        const price = latestPrices[tickerId] ?? pos.avgPrice;
+        // Math.abs() でロング/ショートの区別をなくす
+        const value = Math.abs(pos.qty) * price; 
+        
+        return {
+          name: TICKER_DISPLAY_NAME[tickerId] || tickerId,
+          value: Math.round(value), // 整数に丸める
+        };
+      })
+      // 価値が0より大きいもののみ（念のため）
+      .filter(item => item.value > 0), 
+  ];
 
   // --- 画面 ---
   return (
@@ -443,7 +562,11 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             price={latestPrices[t]}
             holdingQty={player.holdings[t]?.qty}
             registerChart={makeRegisterChart(t)}
-            onSelect={() => setSelectedTicker(t)}
+            onSelect={() => {
+              setSelectedTicker(t); // 1. 銘柄を選択
+              // 2. 数量を再計算 (現在の割合, *新しい*銘柄t)
+              updateQtyBasedOnPct(investPct, t); 
+            }}
             selected={selectedTicker === t}
           />
         ))}
@@ -458,7 +581,7 @@ export default function GameScreen({ playerName }: { playerName: string }) {
           display: "flex",
           flexDirection: "column",
           overflowY: "auto",
-          background: "rgb(17,24,39)", // ← ✅白→ダークに変更
+          background: "rgb(17,24,39)", // ← 白→ダークに変更
           color: "white",
         }}
       >
@@ -471,39 +594,82 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             gap: "1rem",
           }}
         >
+          {/* === 日付パネル（右カラムのヘッダー） === */}
+          {gameDate && (
+            <div
+              style={{
+                background: "rgba(31, 41, 55, 0.75)",
+                padding: "0.75rem 1rem",
+                borderRadius: "0.5rem",
+                border: "1px solid rgb(75, 85, 99)",
+                color: "white",
+                fontSize: "0.9rem",
+                width: "100%",
+                boxSizing: "border-box",
+                backdropFilter: "blur(4px)",
+              }}
+            >
+              <div style={{ fontWeight: "bold", fontSize: "1rem", textAlign: "center" }}>
+                {(() => {
+                  const d = new Date(gameDate * 1000);
+                  return d.toLocaleDateString("ja-JP", {
+                    year: "numeric",
+                    month: "2-digit",
+                    day: "2-digit",
+                  });
+                })()}
+                {" "}
+                ({new Date(gameDate * 1000).toLocaleDateString("ja-JP", {
+                  weekday: "short",
+                })})
+              </div>
+
+              <div
+                style={{
+                  fontSize: "0.85rem",
+                  color: "#d1d5db",
+                  textAlign: "center",
+                  marginTop: "0.25rem",
+                }}
+              >
+                ゲーム終了まであと <b>{remainingDays}</b> 日
+              </div>
+            </div>
+          )}
+
+
           {/* === 資産パネル === */}
           <div style={{ marginBottom: "1rem", flexShrink: 0 }}>
             <h2 className="text-lg font-semibold mb-1">💰 {playerName} の資産</h2>
             {(() => {
               const fmt0 = { maximumFractionDigits: 0 } as const;
 
-              const totalValue =
-                (player?.cash ?? 0) +
-                Object.entries(player?.holdings ?? {}).reduce((sum, [ticker, pos]) => {
-                  if (!pos?.qty) return sum;
-                  const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
-                  return sum + px * pos.qty;
-                }, 0);
+              const totalValue = player.totalValue; 
+              const capitalDelta = player.pnl;        
 
-              const capitalDelta = totalValue - INITIAL_CAPITAL;
-
-              const holdingsValue = Object.entries(player.holdings).reduce(
+              const unrealizedPnl = Object.entries(player.holdings).reduce(
                 (sum, [ticker, pos]) => {
-                  if (!pos.qty) return sum;
+                  if (pos.qty === 0) return sum;
                   const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
-                  return sum + px * pos.qty;
+                  const entry = pos.avgPrice;
+                  return sum + (px - entry) * pos.qty;
                 },
                 0
               );
 
-              const totalPnl = Object.entries(player.holdings).reduce((acc, [ticker, pos]) => {
-                if (!pos.qty) return acc;
-                const px = latestPrices[ticker as TickerId] ?? pos.avgPrice ?? 0;
-                return acc + (px - pos.avgPrice) * pos.qty;
-              }, 0);
+              const entryValue = Object.values(player.holdings)
+                .filter(h => h.qty !== 0)
+                .reduce((sum, h) => sum + Math.abs(h.avgPrice * h.qty), 0);
 
-              const pnlRate =
-                holdingsValue > 0 ? (totalPnl / holdingsValue) * 100 : 0;
+              const currentValue = Object.entries(player.holdings)
+                .filter(([_, h]) => h.qty !== 0)
+                .reduce((sum, [ticker, h]) => {
+                  const px = latestPrices[ticker as TickerId] ?? h.avgPrice;
+                  return sum + Math.abs(px * h.qty);
+                }, 0);
+
+              const pnlRate = entryValue > 0 ? ((currentValue - entryValue) / entryValue) * 100 : 0;
+
 
               return (
                 <>
@@ -525,19 +691,19 @@ export default function GameScreen({ playerName }: { playerName: string }) {
 
                   <p>
                     評価損益:{" "}
-                    <span className={totalPnl >= 0 ? "text-green-400" : "text-red-400"}>
-                      ¥{totalPnl.toLocaleString(undefined, fmt0)}
+                    <span className={unrealizedPnl >= 0 ? "text-green-400" : "text-red-400"}>
+                      ¥{unrealizedPnl.toLocaleString(undefined, fmt0)}
                     </span>
-                    {holdingsValue > 0 && (
+                    {entryValue > 0 && (
                       <span
                         style={{
                           marginLeft: "0.5rem",
                           fontWeight: "bold",
-                          color: totalPnl >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
+                          color: unrealizedPnl >= 0 ? "rgb(74,222,128)" : "rgb(248,113,113)",
                         }}
                       >
-                        ({totalPnl >= 0 ? "+" : ""}
-                        {pnlRate.toFixed(2)}%)
+                        ({unrealizedPnl >= 0 ? "+" : "-"}
+                        {Math.abs(pnlRate).toFixed(2)}%)
                       </span>
                     )}
                   </p>
@@ -560,47 +726,37 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             }}
           >
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={assetHistory}>
+              <AreaChart data={assetHistory.map(d => ({
+                ...d,
+                others: avgOthersHistory.find(o => o.time === d.time)?.value
+              }))}>
                 <XAxis dataKey="time" hide />
                 <YAxis hide domain={["auto", "auto"]} />
-                <ReferenceLine
-                  y={INITIAL_CAPITAL}
-                  stroke="#6b7280"       // ←少し濃いグレー
-                  strokeDasharray="4 4"
-                />
+                <ReferenceLine y={INITIAL_CAPITAL} stroke="#6b7280" strokeDasharray="4 4" />
+
+                {/* 自分の資産ライン */}
+                <Line dataKey="value" stroke="#d1d5db" strokeWidth={2} dot={false} isAnimationActive={false} />
+
+                {/* 他プレイヤー平均（灰色点線） */}
                 <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke="#d1d5db"       // ←ニュートラルな灰色
-                  strokeWidth={2}
+                  dataKey="others"
+                  stroke="#9ca3af"
+                  strokeWidth={1.5}
                   dot={false}
+                  strokeDasharray="4 4"
                   isAnimationActive={false}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="none"
-                  fill="#22c55e"
-                  fillOpacity={0.25}
-                  isAnimationActive={false}
-                  baseValue={INITIAL_CAPITAL}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke="none"
-                  fill="#ef4444"
-                  fillOpacity={0.25}
-                  isAnimationActive={false}
-                  baseValue={INITIAL_CAPITAL}
-                />
+
+                {/* 上昇エリア */}
+                <Area dataKey="value" stroke="none" fill="#22c55e" fillOpacity={0.25} baseValue={INITIAL_CAPITAL} />
+
+                {/* 下落エリア */}
+                <Area dataKey="value" stroke="none" fill="#ef4444" fillOpacity={0.25} baseValue={INITIAL_CAPITAL} />
+
                 <Tooltip content={<CustomTooltip />} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
-
-
-
 
           {/* === 注文パネル === */}
           <div
@@ -619,31 +775,44 @@ export default function GameScreen({ playerName }: { playerName: string }) {
               </span>
             </p>
 
-            {(() => {
-              const currentPrice = latestPrices[selectedTicker];
-              const maxTradableQty =
-                currentPrice && currentPrice > 0
-                  ? Math.floor((player?.cash ?? 0) / currentPrice)
-                  : 0;
-              const fmt0 = { maximumFractionDigits: 0 } as const;
-              const pos = player.holdings[selectedTicker];
-              return (
-                <>
-                  <p className="text-sm text-gray-400">
-                    保有: {pos.qty}株 @ {pos.avgPrice.toFixed(1)}
-                  </p>
-                  <p className="text-sm text-gray-400">
-                    最大 (新規):{" "}
-                    {maxTradableQty.toLocaleString(undefined, fmt0)} 株まで
-                  </p>
-                </>
-              );
-            })()}
+            {/* --- スライダー（投資割合） --- */}
+            <div style={{ marginBottom: "1.25rem" }}>   {/* ←ここで全体の距離を空ける */}
+              <label style={{ fontSize: "0.9rem", display: "block", marginBottom: "0.3rem" }}>
+                💹 投じる現金の割合(%)（{investPct}%）
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={investPct}
+                onChange={(e) => {
+                  const raw = Number(e.target.value);
+                  const snapped = Math.round(raw / 10) * 10;
+                  setInvestPct(snapped);
 
+                  const currentPrice = latestPrices[selectedTicker] ?? 0;
+                  if (currentPrice > 0) {
+                    // ✅ 現金ベースに変更 (cash × %)
+                    const targetValue = (player.cash * snapped) / 100;
+                    setQty(Math.floor(targetValue / currentPrice).toString());
+                  }
+                }}
+                style={{
+                  width: "100%",
+                  cursor: "pointer",
+                  appearance: "none",
+                  height: "6px",
+                  borderRadius: "4px",
+                  background: `linear-gradient(to right, #22c55e ${investPct}%, #4b5563 ${investPct}%)`,
+                }}
+              />
+            </div>
+
+            {/* --- 数量入力欄（バーの下に余白付き） --- */}
             <input
               type="number"
               placeholder="数量"
-              className="rounded w-full mb-2 mt-2"
+              className="rounded w-full mb-3"
               style={{
                 color: "white",
                 background: "rgb(55, 65, 81)",
@@ -653,23 +822,86 @@ export default function GameScreen({ playerName }: { playerName: string }) {
               value={qty}
               onChange={(e) => setQty(e.target.value)}
             />
+
+            {/* --- 買い・売りボタン --- */}
             <div className="flex gap-2">
+              {/* === BUY === */}
               <button
-                onClick={() => order("buy")}
                 className="flex-1 bg-green-600 hover:bg-green-700 rounded py-2 font-bold"
+                onClick={() => {
+                  const currentPrice = latestPrices[selectedTicker] ?? 0;
+                  if (currentPrice <= 0) {
+                    alert("現在の価格が取得できないため、発注できません。");
+                    return;
+                  }
+
+                  // ① 手入力がある場合はこちらを優先
+                  const manualQty = Number(qty);
+
+                  let finalQty = 0;
+
+                  if (manualQty > 0) {
+                    finalQty = manualQty;
+                  } else {
+                    // ② 手入力が0または未入力 → スライダー計算を使用
+                    const investAmount = (player.cash * investPct) / 100;
+                    finalQty = Math.floor(investAmount / currentPrice);
+                  }
+
+                  if (finalQty <= 0) {
+                    alert("数量が0です。バーを動かすか、数量を入力してください。");
+                    return;
+                  }
+
+                  order("buy", undefined, finalQty);
+                }}
               >
                 買い (LONG)
               </button>
+
+
+              {/* === SELL === */}
               <button
-                onClick={() => order("sell")}
                 className="flex-1 bg-red-600 hover:bg-red-700 rounded py-2 font-bold"
+                onClick={() => {
+                  const currentPrice = latestPrices[selectedTicker] ?? 0;
+                  if (currentPrice <= 0) {
+                    alert("現在の価格が取得できないため、発注できません。");
+                    return;
+                  }
+
+                  const posQty = player.holdings[selectedTicker]?.qty ?? 0;
+                  const maxShortQty = Math.floor(player.cash / currentPrice);
+                  const remainingShortQty = maxShortQty - Math.abs(posQty);
+
+                  const manualQty = Number(qty);
+
+                  let finalQty = 0;
+
+                  if (manualQty > 0) {
+                    finalQty = Math.min(manualQty, remainingShortQty);
+                  } else {
+                    const investAmount = (player.cash * investPct) / 100;
+                    const desiredQty = Math.floor(investAmount / currentPrice);
+                    finalQty = Math.min(desiredQty, remainingShortQty);
+                  }
+
+                  if (finalQty <= 0) {
+                    alert("これ以上売れません。（現金の範囲を超えます）");
+                    return;
+                  }
+
+                  order("sell", undefined, finalQty);
+                }}
+
               >
                 売り (SHORT)
               </button>
             </div>
           </div>
 
-          {/* === 保有銘柄一覧（右全体スクロールに合わせて overflow は付けない） === */}
+
+          {/* === 保有銘柄一覧 === */}
           <div
             style={{
               marginTop: "1rem",
@@ -682,7 +914,12 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             }}
           >
             <h2 className="text-lg font-semibold mb-2">📦 保有銘柄</h2>
-            {Object.entries(player.holdings)
+            {Object.entries(player.holdings).filter(([_, pos]) => pos.qty !== 0).length === 0 ? (
+              <p style={{ color: "rgb(156,163,175)", fontSize: "0.875rem" }}>
+                今持っている銘柄はありません
+              </p>
+            ) : (
+            Object.entries(player.holdings)
               .filter(([_, pos]) => !!pos.qty)
               .map(([ticker, pos]) => {
                 const tickerId = ticker as TickerId;
@@ -750,8 +987,97 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                     </div>
                   </div>
                 );
-              })}
+              }))}
           </div>
+
+          <div style={{ width: "100%", height: 220, flexShrink: 0, marginTop: "0.5rem", marginBottom: "1.5rem" }}>
+            <h3 className="text-lg font-semibold mb-1" style={{ textAlign: 'center' }}>📊 ポートフォリオ</h3>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={65} // 円グラフのサイズ
+                  fill="#8884d8"
+                >
+                  {pieData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                {/* ホバーした時のツールチップ */}
+                <Tooltip
+                  formatter={(value: number) => `¥${value.toLocaleString()}`}
+                  contentStyle={{ 
+                    background: "#1f2937", 
+                    border: "1px solid #374151", 
+                    borderRadius: "6px" 
+                  }}
+                  itemStyle={{ color: "white" }}
+                />
+                {/* 凡例 (右側に表示) */}
+                <Legend
+                  layout="vertical"
+                  align="right"
+                  verticalAlign="middle"
+                  wrapperStyle={{ fontSize: "12px", paddingLeft: "10px" }}
+                  formatter={(value, _) => (
+                    <span style={{ color: 'white' }}>{value}</span>
+                  )}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* === 過去ニュース一覧 === */}
+          <div
+            style={{
+              marginTop: "1rem",
+              borderTop: "1px solid rgb(55, 65, 81)",
+              paddingTop: "1rem",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.5rem",
+            }}
+          >
+            <h2 className="text-lg font-semibold mb-2">📰 過去ニュース</h2>
+
+            {newsLog.length === 0 ? (
+              <p style={{ color: "rgb(156,163,175)", fontSize: "0.875rem" }}>
+                まだニュースはありません
+              </p>
+            ) : (
+              <div
+                style={{
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  border: "1px solid rgb(55, 65, 81)",
+                  borderRadius: "0.5rem",
+                  background: "rgb(31, 41, 55)",
+                  padding: "0.5rem 0.75rem",
+                }}
+              >
+                {newsLog.map((ev, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      borderBottom: "1px solid rgb(55, 65, 81)",
+                      padding: "0.25rem 0",
+                      fontSize: "0.875rem",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setNewsPopup(ev)} // ← クリックで再表示もできる
+                  >
+                    {i + 1}. {ev.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
       
@@ -780,7 +1106,7 @@ export default function GameScreen({ playerName }: { playerName: string }) {
               borderRadius: "0.75rem",
               boxShadow:
                 "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
-              width: "400px",
+              width: "420px",
               border: "1px solid rgb(75, 85, 99)",
             }}
           >
@@ -792,36 +1118,151 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             {/* 現在ポジション */}
             <div className="text-lg mb-4">
               現在：
-              <span
-                className={closeModal.qty > 0 ? "text-green-400" : "text-red-400"}
-              >
+              <span className={closeModal.qty > 0 ? "text-green-400" : "text-red-400"}>
                 {closeModal.qty > 0 ? "LONG " : "SHORT "}
                 {Math.abs(closeModal.qty)}株
               </span>
             </div>
 
-            {/* ✅ すべて決済（数量入力不要） */}
+            {/* --- 全決済の損益表示 --- */}
+            {(() => {
+              const posQty = closeModal.qty;
+              const maxQty = Math.abs(posQty);
+              const holding = player.holdings[closeModal.ticker];
+              const avgPrice = holding?.avgPrice ?? 0;
+              const currentPrice = latestPrices[closeModal.ticker] ?? 0;
+
+              const pnl =
+                posQty > 0
+                  ? (currentPrice - avgPrice) * maxQty
+                  : (avgPrice - currentPrice) * maxQty;
+
+              return (
+                <div className="text-sm mb-2">
+                  全て決済した場合の損益：{" "}
+                  <span
+                    style={{
+                      color: pnl >= 0 ? "#22c55e" : "#ef4444",
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {pnl >= 0 ? "+" : ""}
+                    {Math.floor(pnl).toLocaleString()} 円
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* --- 全決済ボタン --- */}
             <button
               onClick={() => {
                 handleClose(Math.abs(closeModal.qty));
                 setCloseModal(null);
                 setPartialQty("");
+                setClosePct(0);
               }}
               className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg text-lg mb-4"
             >
               すべて決済
             </button>
 
-            {/* ✅ 一部決済 */}
+            {/* --- スライダー決済 --- */}
             <div style={{ borderTop: "1px solid rgb(55, 65, 81)", paddingTop: "1rem" }}>
-              <p className="text-sm mb-2">一部決済する数量を入力 (最大: {Math.abs(closeModal.qty)})</p>
+              <p className="text-sm mb-2">
+                🔧 決済割合 (%) を選択（{closePct}%）
+              </p>
+
+              {/* スナップ付きスライダー（吸い付く） */}
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={10}  // ★10%刻みで吸い付く
+                value={closePct}
+                onChange={(e) => {
+                  const raw = Number(e.target.value);
+
+                  // ★吸い付く処理（最近の10%に丸める）
+                  const snapped = Math.round(raw / 10) * 10;
+                  setClosePct(snapped);
+
+                  const maxQty = Math.abs(closeModal.qty);
+                  const qty = Math.floor((maxQty * snapped) / 100);
+                  setPartialQty(qty.toString());
+                }}
+                style={{
+                  width: "100%",
+                  cursor: "pointer",
+                  appearance: "none",
+                  height: "6px",
+                  borderRadius: "4px",
+                  background: `linear-gradient(to right, #22c55e ${closePct}%, #4b5563 ${closePct}%)`,
+                  marginBottom: "0.5rem",
+                }}
+              />
+
+              {/* 決済数量表示 */}
+              {partialQty && Number(partialQty) > 0 && (
+                <div className="mb-2 text-sm">
+                  決済数量：<span className="font-bold">{partialQty} 株</span>
+                </div>
+              )}
+
+              {/* 損益計算 */}
+              {partialQty && Number(partialQty) > 0 && (
+                <div className="text-sm mb-3">
+                  {(() => {
+                    const qtyToClose = Number(partialQty);
+                    const currentPrice = latestPrices[closeModal.ticker] ?? 0;
+
+                    const holding = player.holdings[closeModal.ticker];
+                    const avgPrice = holding?.avgPrice ?? 0;
+                    const posQty = holding?.qty ?? 0;
+
+                    const pnl =
+                      posQty > 0
+                        ? (currentPrice - avgPrice) * qtyToClose
+                        : (avgPrice - currentPrice) * qtyToClose;
+
+                    return (
+                      <div>
+                        今この数量を決済した場合の損益：{" "}
+                        <span
+                          style={{
+                            color: pnl >= 0 ? "#22c55e" : "#ef4444",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {pnl >= 0 ? "+" : ""}
+                          {Math.floor(pnl).toLocaleString()} 円
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* --- 手入力欄 --- */}
+              <p className="text-sm mb-2">
+                数量を入力 (最大: {Math.abs(closeModal.qty)})
+              </p>
+
               <input
                 type="number"
                 placeholder="数量"
                 value={partialQty}
-                onChange={(e) => setPartialQty(e.target.value)}
                 min={1}
                 max={Math.abs(closeModal.qty)}
+                onChange={(e) => {
+                  const val = Number(e.target.value);
+                  setPartialQty(e.target.value);
+
+                  const maxQty = Math.abs(closeModal.qty);
+                  const pct = Math.round((val / maxQty) * 100);
+
+                  // 手入力も10%に吸い付く
+                  setClosePct(Math.min(100, Math.max(0, Math.round(pct / 10) * 10)));
+                }}
                 className="rounded w-full mb-3"
                 style={{
                   color: "white",
@@ -831,24 +1272,28 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                 }}
               />
 
-              {/* ボタン類 */}
+              {/* ボタン群 */}
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
                 <button
                   onClick={() => {
                     setCloseModal(null);
                     setPartialQty("");
+                    setClosePct(0);
                   }}
                   className="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg"
                 >
                   キャンセル
                 </button>
+
                 <button
                   onClick={() => {
-                    const qtyToClose = Number(partialQty);
-                    if (qtyToClose > 0 && qtyToClose <= Math.abs(closeModal.qty)) {
-                      handleClose(qtyToClose);
+                    const qty = Number(partialQty);
+                    const maxQty = Math.abs(closeModal.qty);
+                    if (qty > 0 && qty <= maxQty) {
+                      handleClose(qty);
                       setCloseModal(null);
                       setPartialQty("");
+                      setClosePct(0);
                     } else {
                       alert("数量が正しくありません。");
                     }
@@ -865,11 +1310,22 @@ export default function GameScreen({ playerName }: { playerName: string }) {
 
 
 
-      {/* ✅ ← ここを忘れるとニュースが出ない */}
+
+
+      {/* ここを忘れるとニュースが出ない */}
       {newsPopup && (
         <NewsModal
           ev={newsPopup}
           onClose={() => setNewsPopup(null)}
+        />
+      )}
+
+      {/* ゲーム終了モーダル */}
+      {gameOver && (
+        <GameEndModal
+          reason={gameOverReason!}
+          player={player}
+          onClose={() => window.location.reload()}
         />
       )}
     </div>

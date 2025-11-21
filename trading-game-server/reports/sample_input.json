@@ -1,0 +1,15 @@
+{
+  "username": "テスト太郎",
+  "equity_curve": [100000000, 101000000, 99000000, 105000000],
+  "stats": {
+    "return_pct": 5.0,
+    "return_jpy": 5000000,
+    "win_rate": 55.0,
+    "max_dd": -12.0
+  },
+  "volume_by_ticker": {
+    "BANK": 24000000,
+    "AI": 17000000,
+    "AUTO": 12000000
+  }
+}

@@ -1,30 +1,35 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
-// react-router-dom から必要なものをインポート
+
 import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
 
-import App from './App.tsx' // プレイヤー画面
+import App from './App.tsx'               // プレイヤー画面
 import { GameMasterAdmin } from './GameMasterAdmin.tsx'; // 管理画面
+import TradingBotPage from './tradingbot.tsx'; // AI画面！！
+
 
 // ルート(URL)の定義
 const router = createBrowserRouter([
   {
-    path: "/", // プレイヤーがアクセスするURL (ルート)
+    path: "/",               // 通常のプレイヤー用
     element: <App />,
   },
   {
-    path: "/admin", // ゲームマスターがアクセスするURL
+    path: "/admin",          // ゲームマスター用
     element: <GameMasterAdmin />,
+  },
+  {
+    path: "/tradingbot",     // AIトレーダー用
+    element: <TradingBotPage />,
   },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {/* 以前の <App /> の代わりに、RouterProvider をレンダリング */}
     <RouterProvider router={router} />
   </React.StrictMode>,
 )
