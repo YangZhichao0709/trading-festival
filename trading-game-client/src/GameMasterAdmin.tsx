@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { socket } from "./App"; 
 import { API_BASE } from "./apiConfig"; 
+import DownloadReportButton  from "./components/DownloadReportButton";
 
 const SERVER_URL = API_BASE; 
 
@@ -14,6 +15,40 @@ type Player = {
 };
 
 type AllPlayers = Record<string, Player>; 
+
+const handleDownloadPdf = async (playerName?: string) => {
+  try {
+    const response = await fetch(`${API_BASE}/admin/export-pdf`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      // 名前があればJSONで送る、なければ空ボディ（＝全員）
+      body: JSON.stringify({ playerName }) 
+    });
+
+    if (!response.ok) throw new Error('Download failed');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // サーバー側で設定したファイル名(ヘッダー)があれば使うが、
+    // ここで強制的に指定することも可能
+    if (playerName) {
+        a.download = `Report_${playerName}.pdf`;
+    } else {
+        a.download = `All_Players_Report.pdf`;
+    }
+    
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error(e);
+    alert('PDF生成に失敗しました');
+  }
+};
 
 // === コンポーネント本体 ===
 export function GameMasterAdmin() {
@@ -157,6 +192,8 @@ export function GameMasterAdmin() {
           リセット（待機画面に戻す）
         </button>
 
+        <DownloadReportButton />
+
         {message && (
           <p
             style={{
@@ -207,6 +244,7 @@ export function GameMasterAdmin() {
               <th style={{ padding: "12px 15px", textAlign: "right" }}>評価損益 (PnL)</th>
               <th style={{ padding: "12px 15px", textAlign: "right" }}>所持現金</th>
               <th style={{ padding: "12px 15px", textAlign: "left" }}>保有株式</th>
+              <th style={{ padding: "12px 15px", textAlign: "center" }}>レポート</th>
             </tr>
           </thead>
           <tbody>
@@ -277,12 +315,33 @@ export function GameMasterAdmin() {
                       .map(([name, h]) => `${name}: ${h.qty}株`)
                       .join(", ") || "なし"}
                   </td>
+                  <td style={{ padding: "12px 15px", textAlign: "center" }}>
+                    <button
+                      onClick={() => handleDownloadPdf(playerName)}
+                      style={{
+                        padding: "6px 12px",
+                        fontSize: "0.85rem",
+                        fontWeight: "bold",
+                        color: "white",
+                        backgroundColor: "#718096", // グレー
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.1)"
+                      }}
+                      // マウスを乗せた時に色を濃くする
+                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = "#4a5568"}
+                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = "#718096"}
+                    >
+                      ⬇ PDF
+                    </button>
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={6} // ★ 修正: 列が増えたので 6
+                  colSpan={7} 
                   style={{
                     padding: "20px",
                     textAlign: "center",

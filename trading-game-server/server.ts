@@ -3,6 +3,10 @@ import * as http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
 
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs'; // PDF生成用
+
 import { state, updatePrices, triggerEventById } from "./src/core/events";
 import { trade, getPlayerInfo, players } from "./src/core/trading";
 import {
@@ -146,6 +150,24 @@ function startGameLoop(tickMs = 3000) {
 
       // 現在の日付を通知
       broadcastGameDate();
+
+      // その日のゲーム内日付を取得+もし日付が取得できなかったら、現在の日時を文字として入れる(フォールバック)
+      const todayStr = BUSINESS_DAYS_2026[currentBusinessDayIndex] || new Date().toISOString();
+      
+      // 全プレイヤーのその時点の資産を記録
+      for (const [id, player] of Object.entries(players)) {
+          // まだ履歴配列がなければ作る（念のため）
+          if (!player.history) player.history = [];
+          
+          player.history.push({
+              timestamp: todayStr,      // 例: "2026-01-02"
+              total_asset: player.totalValue,
+              // daily記録ではPnLなどは不要なので0やundefinedでOKですが
+              // 型定義に合わせて埋めるなら以下のようになります
+              pnl: 0, price: 0, quantity: 0, ticker: "",
+              type: 'daily'
+          });
+      }
 
       // ★★★ イベント発生ロジック (ストーリー優先) ★★★
       if (currentStoryRoute) {
@@ -430,4 +452,119 @@ app.get("/api/rl/state", (_req, res) => {
     ok: true,
     state,
   });
+});
+
+
+// ---------------------------------------------------
+// PDF出力用エンドポイント
+// ---------------------------------------------------
+// 必要な変数がインポートされているか確認してください
+// import { state } from "./src/core/events";
+// import { BUSINESS_DAYS_2026 } from "./src/core/constants"; 
+
+app.post("/admin/export-pdf", (req: Request, res: Response) => {
+  // リクエストから対象プレイヤー名を取得
+  const targetPlayerName = req.body.playerName;
+  console.log(`[Admin] PDF Export requested. Target: ${targetPlayerName || "ALL"}`);
+
+  try {
+    // -------------------------------------------------
+    // 1. プレイヤーデータの準備 (playersList)
+    // -------------------------------------------------
+    let playersList = [];
+
+    // 共通の整形関数
+    const formatUserForPdf = (name: string, p: any) => {
+      // 履歴がない場合のダミーデータ (timestampのエラー対策済み)
+      let historyData = p.history || [];
+      
+      if (historyData.length === 0) {
+        // 日付配列の最初、なければ現在時刻を入れる
+        const defaultDate = "2026-01-02";
+        
+        historyData = [{
+          timestamp: defaultDate,
+          total_asset: 100000000, // 初期資産
+          pnl: 0, price: 0, quantity: 0, ticker: "",
+          type: 'daily'
+        }];
+      }
+      return { name: name, history: historyData };
+    };
+
+    // 特定ユーザーか全員かで分岐
+    if (targetPlayerName && players[targetPlayerName]) {
+      playersList.push(formatUserForPdf(targetPlayerName, players[targetPlayerName]));
+    } else {
+      playersList = Object.entries(players).map(([name, p]) => formatUserForPdf(name, p));
+    }
+
+    // -------------------------------------------------
+    // 2. 市場データ(日経平均)の準備 (marketData)
+    // -------------------------------------------------
+    // ※日経平均のTicker IDを 'N225' と仮定しています。
+    // constants.tsで定義しているID (例: "INDEX" や "N225") に合わせてください
+    const nikkeiTickerId = "NIKKEI"; 
+    const nikkeiPrices = state.prices[nikkeiTickerId] || [];
+
+    const marketData = {
+      nikkei: nikkeiPrices.map((price, index) => ({
+        // 営業日配列とインデックスを対応させる
+        date: BUSINESS_DAYS_2026[index] || `Day${index}`,
+        price: price
+      }))
+    };
+
+    // -------------------------------------------------
+    // 3. Pythonへ渡す統合データ作成
+    // -------------------------------------------------
+    const dataForPython = {
+      players: playersList,
+      market: marketData
+    };
+
+    // -------------------------------------------------
+    // 4. Pythonスクリプト実行
+    // -------------------------------------------------
+    const scriptPath = path.join(process.cwd(), 'generate_report.py');
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const pythonProcess = spawn(pythonCmd, [scriptPath]);
+
+    let outputData = '';
+    let errorData = '';
+
+    // ★ 変更点: 配列ではなく、playersとmarketを含んだオブジェクトを送信
+    pythonProcess.stdin.write(JSON.stringify(dataForPython));
+    pythonProcess.stdin.end();
+
+    pythonProcess.stdout.on('data', (data) => { outputData += data.toString(); });
+    pythonProcess.stderr.on('data', (data) => { errorData += data.toString(); console.error(`[Python stderr]: ${data}`); });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        return res.status(500).json({ error: 'PDF generation failed', details: errorData });
+      }
+
+      const generatedPath = outputData.trim();
+
+      // ファイル名決定ロジック
+      const downloadFilename = targetPlayerName 
+        ? `Report_${targetPlayerName}.pdf` 
+        : `Trading_Result_All_${new Date().toISOString().slice(0,10)}.pdf`;
+
+      if (fs.existsSync(generatedPath)) {
+        res.download(generatedPath, downloadFilename, (err) => {
+          if (!err) {
+            // fs.unlinkSync(generatedPath); // 必要ならコメントアウト解除
+          }
+        });
+      } else {
+        res.status(500).json({ error: 'File not found' });
+      }
+    });
+
+  } catch (e: any) {
+    console.error(e);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });

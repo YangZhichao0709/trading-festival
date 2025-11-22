@@ -45,6 +45,59 @@ import type {
 
 import GameEndModal from "./GameEndModal";
 
+const COMPANY_DESCRIPTIONS: Record<string, string> = {
+  "BANK": "【三井住友フィナンシャルグループ】\n日本の3大メガバンクの一角。企業の資金調達支援や個人の資産運用、海外展開など幅広い金融サービスを手掛ける。",
+  "SEMI": "【東京エレクトロン】\n半導体製造装置で世界トップクラスのシェアを持つ。スマホやPC、AIに使われる半導体の進化を支える技術集団。",
+  "AUTO": "【トヨタ自動車】\n日本が誇る世界最大級の自動車メーカー。ハイブリッド車技術に強みを持ち、EVや水素エンジンなどの次世代モビリティも開発。",
+  "PHARMA": "【武田薬品工業】\n国内製薬トップ。グローバルな研究開発体制を持ち、がん、消化器系疾患、希少疾患などの新薬開発に注力している。",
+  "NITORI": "【ニトリホールディングス】\n「お、ねだん以上。」で有名な家具・インテリア製造小売り最大手。円安が逆風となるが、海外展開も加速中。",
+  "UTIL": "【関西電力】\n近畿地方を地盤とする電力会社。原子力発電所の再稼働実績があり、電力供給の安定性と脱炭素への取り組みを進める。",
+  "AIR": "【ANAホールディングス】\n国内線・国際線ともに国内最大規模の航空会社。インバウンド需要の回復や貨物事業が業績の鍵を握る。",
+  "GAME": "【任天堂】\n『マリオ』『ゼルダ』『ポケモン』など世界的人気IPを多数抱えるゲーム機・ソフトメーカー。円安は海外売上にとって追い風。",
+  "ENEOS": "【ENEOSホールディングス】\n国内石油元売り最大手。ガソリンスタンドの運営のほか、水素エネルギーや再生可能エネルギー事業も育成中。",
+  "GOLD": "【ゴールド (金)】\n「有事の金」として知られる安全資産。インフレヘッジや地政学的リスクが高まった際に買われやすい。",
+  "USDJPY": "【ドル円 (為替)】\n日本円と米ドルの交換レート。日米の金利差や貿易収支によって変動し、輸出入企業の業績に大きく影響する。",
+  "NIKKEI": "【日経平均株価】\n日本を代表する225社の株価の平均指数。日本経済全体の動向を示すバロメーターとして世界中が注目する。半導体に大きく影響を受ける。",
+};
+
+function CompanyModal({ ticker, onClose }: { ticker: TickerId; onClose: () => void }) {
+  const desc = COMPANY_DESCRIPTIONS[ticker] || "説明情報がありません。";
+  const name = TICKER_DISPLAY_NAME[ticker];
+
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 3000,
+      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(2px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }} onClick={onClose}>
+      <div style={{
+        background: "rgb(31, 41, 55)", border: "1px solid rgb(75, 85, 99)",
+        borderRadius: "0.75rem", padding: "1.5rem", width: "400px",
+        color: "white", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+        maxWidth: "90vw"
+      }} onClick={e => e.stopPropagation()}>
+        
+        <h3 className="text-xl font-bold text-yellow-400 mb-4 border-b border-gray-600 pb-2">
+          🏢 {name}
+        </h3>
+        <p style={{ whiteSpace: "pre-wrap", lineHeight: 1.6, fontSize: "0.95rem" }}>
+          {desc}
+        </p>
+        
+        <div className="mt-6 text-right">
+          <button 
+            onClick={onClose}
+            className="bg-gray-600 hover:bg-gray-500 px-4 py-2 rounded text-sm"
+          >
+            閉じる
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // --- ローソク足に変換する関数 ---
 function pricesToCandles(prices: number[]): CandlestickData[] {
   if (!prices?.length) return [];
@@ -131,26 +184,32 @@ function ChartTile({
   tickerId, 
   price, holdingQty,
   registerChart,
-  onSelect, selected,
+  onSelect, 
+  onInfoClick, // ★追加: 説明ボタン用ハンドラ
+  selected,
 }: {
   tickerId: TickerId;
   price?: number;
   holdingQty?: number;
   registerChart: (el: HTMLDivElement | null) => void;
   onSelect: () => void;
+  onInfoClick: () => void; // ★追加
   selected: boolean;
 }) {
   const baseStyle: React.CSSProperties = {
     background: "rgb(17,24,39)",
-    borderRadius: "0.75rem",
+    borderRadius: "0.5rem", // 少し角丸を小さくしてキッチリ感を出す
     border: "1px solid rgb(55,65,81)",
     overflow: "hidden",
     cursor: "pointer",
-    height: 194,
+    width: "100%",
+    height: "100%", 
+    display: "flex", flexDirection: "column",
   };
   const selectedStyle: React.CSSProperties = {
     ...baseStyle,
     boxShadow: "0 0 0 2px #facc15",
+    borderColor: "#facc15",
   };
 
   return (
@@ -160,24 +219,43 @@ function ChartTile({
         height: "1.75rem",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 0.5rem",
-        background: "rgba(31,41,55,0.8)",
+        background: "rgba(31,41,55,0.9)", // 少し濃く
+        flexShrink: 0,
+        borderBottom: "1px solid rgba(255,255,255,0.1)"
       }}>
         <div style={{ fontSize: "0.75rem", fontFamily: "monospace", color: "rgb(134,239,172)" }}>
           {price?.toFixed(2)}
         </div>
-        <div style={{ fontSize: "0.875rem", fontWeight: "bold", color: "white" }}>{TICKER_DISPLAY_NAME[tickerId]}</div>
+        
+        {/* ★修正: 企業名をクリック可能に */}
+        <div 
+          onClick={(e) => {
+            e.stopPropagation(); // 親の「選択」イベントを止める
+            onInfoClick();       // 説明モーダルを開く
+          }}
+          className="hover:text-yellow-300 hover:underline" // ホバー時のスタイル
+          style={{ 
+            fontSize: "0.8rem", fontWeight: "bold", color: "white", 
+            cursor: "help", // カーソルを「？」にする
+            marginLeft: "auto" // 右寄せ気味に
+          }}
+          title="クリックして企業情報を表示"
+        >
+          {TICKER_DISPLAY_NAME[tickerId]} <span style={{fontSize: "0.7em"}}>ℹ️</span>
+        </div>
       </div>
 
-      {/* チャート描画領域 */}
-      <div ref={registerChart} style={{ height: 142 }} />
+      {/* チャート */}
+      <div ref={registerChart} style={{ flex: 1, width: "100%", minHeight: 0 }} />
 
-      {/* フッター（保有数量） */}
+      {/* フッター */}
       <div style={{
         height: "1.5rem",
         display: "flex", alignItems: "center",
         padding: "0 0.5rem",
-        background: "rgba(31,41,55,0.7)",
+        background: "rgba(31,41,55,0.8)",
         fontSize: "0.75rem", color: "rgb(209,213,219)",
+        flexShrink: 0,
       }}>
         {holdingQty ? `${holdingQty}株` : "\u00A0"}
       </div>
@@ -211,6 +289,8 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   const [investPct, setInvestPct] = useState(0); // 0〜100 (%)
   const [newsLog, setNewsLog] = useState<NewsEvent[]>([]); // これはニュース履歴用
   const [closePct, setClosePct] = useState(0); // 決済割合（0〜100）
+  // ★追加: 企業説明モーダル用のstate
+  const [companyInfoTarget, setCompanyInfoTarget] = useState<TickerId | null>(null);
 
   // --- 資産履歴（Recharts用） ---
   const [assetHistory, setAssetHistory] = useState<Array<{ time: number; value: number }>>([]);
@@ -542,17 +622,25 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   return (
     <div
       className="flex h-screen bg-black text-white"
-      style={{ fontFamily: "sans-serif", overflow: "hidden" }}
+      style={{ 
+        fontFamily: "sans-serif", 
+        overflow: "hidden", 
+        width: "100vw",
+        height: "100vh" // 念のため明示
+      }}
     >
-      {/* 左：3列グリッド（固定表示・スクロールなし） */}
+      {/* 左：3列グリッド (レイアウト修正版) */}
       <div
-        className="grid gap-3 p-4"
         style={{
+          flex: 3,
+          height: "100%",
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gridTemplateRows: "repeat(4, 1fr)",
-          flex: 3,
-          overflow: "hidden",
+          gridTemplateRows: "repeat(4, 1fr)", 
+          // ★修正: 余白(padding/gap)を極小にして画面いっぱいに使う
+          gap: "4px",     
+          padding: "4px", 
+          boxSizing: "border-box",
         }}
       >
         {TICKERS.map((t) => (
@@ -563,10 +651,11 @@ export default function GameScreen({ playerName }: { playerName: string }) {
             holdingQty={player.holdings[t]?.qty}
             registerChart={makeRegisterChart(t)}
             onSelect={() => {
-              setSelectedTicker(t); // 1. 銘柄を選択
-              // 2. 数量を再計算 (現在の割合, *新しい*銘柄t)
-              updateQtyBasedOnPct(investPct, t); 
+              setSelectedTicker(t);
+              updateQtyBasedOnPct(investPct, t);
             }}
+            // ★追加: 説明クリック時
+            onInfoClick={() => setCompanyInfoTarget(t)}
             selected={selectedTicker === t}
           />
         ))}
@@ -835,17 +924,21 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                     return;
                   }
 
-                  // ① 手入力がある場合はこちらを優先
-                  const manualQty = Number(qty);
-
+                  // ★修正2: 注文直前に再計算するロジック
                   let finalQty = 0;
 
-                  if (manualQty > 0) {
-                    finalQty = manualQty;
+                  // スライダー(%)が設定されている場合は、スライダーの値を優先して「現在の価格」で再計算
+                  if (investPct > 0) {
+                    const targetValue = (player.cash * investPct) / 100;
+                    finalQty = Math.floor(targetValue / currentPrice);
+                    
+                    // 計算結果が0になってしまった場合のケア（資金不足など）
+                    if (finalQty <= 0 && investPct > 0) {
+                       // 1株も買えない場合はアラートを出すか、あるいは0のまま弾く
+                    }
                   } else {
-                    // ② 手入力が0または未入力 → スライダー計算を使用
-                    const investAmount = (player.cash * investPct) / 100;
-                    finalQty = Math.floor(investAmount / currentPrice);
+                    // スライダーが0なら手入力欄(qty)の値を信用する
+                    finalQty = Number(qty);
                   }
 
                   if (finalQty <= 0) {
@@ -853,6 +946,10 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                     return;
                   }
 
+                  // 再計算した数量でセットし直して発注
+                  // (表示上のqtyも更新しておくと親切)
+                  setQty(finalQty.toString());
+                  
                   order("buy", undefined, finalQty);
                 }}
               >
@@ -870,20 +967,29 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                     return;
                   }
 
-                  const posQty = player.holdings[selectedTicker]?.qty ?? 0;
-                  const maxShortQty = Math.floor(player.cash / currentPrice);
-                  const remainingShortQty = maxShortQty - Math.abs(posQty);
-
-                  const manualQty = Number(qty);
-
+                  // ★修正2: 売りも同様に再計算
                   let finalQty = 0;
+                  
+                  // ショート可能な最大数量（現金ベース）
+                  const maxShortQty = Math.floor(player.cash / currentPrice);
+                  const posQty = player.holdings[selectedTicker]?.qty ?? 0;
+                  // 既にショートしている分があれば、さらに売れる枠は減る（またはロングの解消分）
+                  // ここではシンプルに「現金枠で新規に売れる限界 + 現在のポジション解消」などは考慮せず
+                  // 元のロジック「現金全額分までショート可」に準拠します
+                  const remainingShortQty = maxShortQty - (posQty < 0 ? Math.abs(posQty) : 0); 
+                  // ※注: 元コードのロジックに従い、ロング保有時は単純に現金枠で計算
 
-                  if (manualQty > 0) {
-                    finalQty = Math.min(manualQty, remainingShortQty);
-                  } else {
+                  if (investPct > 0) {
+                    // スライダー%に基づいて「売りたい金額」を算出
                     const investAmount = (player.cash * investPct) / 100;
                     const desiredQty = Math.floor(investAmount / currentPrice);
+                    
+                    // 許容範囲内に丸める
                     finalQty = Math.min(desiredQty, remainingShortQty);
+                  } else {
+                    // 手入力
+                    const manualQty = Number(qty);
+                    finalQty = Math.min(manualQty, remainingShortQty);
                   }
 
                   if (finalQty <= 0) {
@@ -891,6 +997,7 @@ export default function GameScreen({ playerName }: { playerName: string }) {
                     return;
                   }
 
+                  setQty(finalQty.toString());
                   order("sell", undefined, finalQty);
                 }}
 
@@ -1309,7 +1416,13 @@ export default function GameScreen({ playerName }: { playerName: string }) {
       )}
 
 
-
+      {/* ★追加: 企業説明モーダル表示 */}
+      {companyInfoTarget && (
+        <CompanyModal 
+          ticker={companyInfoTarget} 
+          onClose={() => setCompanyInfoTarget(null)} 
+        />
+      )}
 
 
       {/* ここを忘れるとニュースが出ない */}

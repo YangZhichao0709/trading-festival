@@ -67,7 +67,7 @@ export const EVENTS = [
     id: "historic_yen_weakness",
     name: "歴史的な円安",
     description: "為替が大きく変動。輸出関連企業に強い追い風。",
-    tickers: [{ ticker: "USDJPY", a: 3, k: 0.1 }],
+    tickers: [{ ticker: "USDJPY", a: 3, k: 0.05 }],
   },
   {
     id: "boj_rate_hike_small",
@@ -143,7 +143,7 @@ export const EVENTS = [
     name: "財務省が円買い介入を実施",
     description:
       "急激な円安を止めるための為替介入。短期的に円高方向に振れやすい。",
-    tickers: [{ ticker: "USDJPY", a: 1, k: -0.4 }],
+    tickers: [{ ticker: "USDJPY", a: 1, k: -0.15 }],
   },
   {
     id: "boj_surprise_rate_hike",
@@ -252,7 +252,7 @@ export const EVENTS = [
     name: "米雇用統計がサプライズの強さ",
     description:
       "米国金利が上昇するとの見通しから、ドル買いが優勢になりやすく、ドル円は上昇方向へ。",
-    tickers: [{ ticker: "USDJPY", a: 1, k: 0.2 }],
+    tickers: [{ ticker: "USDJPY", a: 1, k: 0.08 }],
   },
   {
     id: "nuclear_plant_restart",
@@ -507,7 +507,7 @@ export const EVENTS = [
     name: "日銀が利上げ発表！！",
     description:
       "日銀が政策金利を25bp引き上げ。政策金利がこの水準になるのは17年ぶり。",
-    tickers: [{ ticker: "USDJPY", a: 2, k: -0.25 }, { ticker: "BANK", a: 2, k: 0.25 }],
+    tickers: [{ ticker: "USDJPY", a: 2, k: -0.1 }, { ticker: "BANK", a: 2, k: 0.25 }],
   },
   {
     id: "tariff_hike_us_president",
@@ -595,7 +595,7 @@ export const EVENTS = [
       "国際情勢の緊迫化を受け、政府が防衛費の大幅増額方針を表明。財政悪化懸念から長期金利の上昇を意識される。",
     tickers: [
       { ticker: "BANK", a: 2, k: 0.1 },
-      { ticker: "USDJPY", a: 2, k: 0.08 },
+      { ticker: "USDJPY", a: 2, k: 0.03 },
     ],
   },
   // --- レーティング関連 (ランダムイベント向き) ---
@@ -721,6 +721,8 @@ export const EVENTS = [
       "世界的投資家ウォーレン・バフェット氏が講演で『日本企業の価値は世界的に見て過小評価されている』とコメント。この発言を受けて、割安な銀行株を中心に買いが入る。",
     tickers: [
       { ticker: "BANK", a: 3, k: 0.15 },
+      { ticker: "AUTO", a: 3, k: 0.15 },
+      { ticker: "SEMI", a: 3, k: 0.15 },
     ],
   },
   {
@@ -773,7 +775,13 @@ export const STORY_ROUTES = {
     { dayIndex: 70, eventId: "geopolitical_risk_surges_gold" }, // 地政学リスク（金↑）
     { dayIndex: 90, eventId: "tariff_hike_us_president" }, // 保護主義・関税引き上げ
     { dayIndex: 120, eventId: "new_cabinet_fiscal_stimulus" }, // 新内閣が財政出動
-    { dayIndex: 150, eventId: "swiss_bank_credit_fears_2_resolved" }, // 信用不安、払拭
+    { dayIndex: 135, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 150, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 160, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
+    { dayIndex: 172, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 190, eventId: "swiss_bank_credit_fears_2_resolved" }, // 信用不安、払拭
+    { dayIndex: 200, eventId: "us_president_ai_semi_deregulation",}, //バフェット
+    { dayIndex: 210, eventId: "rating_nikkei_up",} //日本株オーバーウェイト
   ],
 
   // ストーリーB: パンデミックルート
@@ -783,25 +791,31 @@ export const STORY_ROUTES = {
     { dayIndex: 30, eventId: "antarctica_virus_detected" }, // 南極で未知のウイルス（恐怖↑）
     { dayIndex: 45, eventId: "nitori_same_store_sales_up" }, // 巣ごもり需要でニトリ好調
     { dayIndex: 60, eventId: "boj_easing_strengthened_qe" }, // 世界的に金融緩和
-    { dayIndex: 80, eventId: "pharma_phase3_success" }, // ワクチン治験成功
-    { dayIndex: 100, eventId: "new_drug_approval_venture" }, // 新薬承認
-    { dayIndex: 120, eventId: "airline_slots_expanded" }, // 経済再開へ、国際線発着枠拡大
-    { dayIndex: 140, eventId: "inbound_tourism_boom" }, // インバウンド絶好調
-    { dayIndex: 160, eventId: "us_cpi_surprise_high" }, // 緩和しすぎでインフレ発生
+    { dayIndex: 80, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 100, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 120, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
+    { dayIndex: 140, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 160, eventId: "pharma_phase3_success" }, // ワクチン治験成功
+    { dayIndex: 180, eventId: "new_drug_approval_venture" }, // 新薬承認
+    { dayIndex: 200, eventId: "airline_slots_expanded" }, // 経済再開へ、国際線発着枠拡大
+    { dayIndex: 220, eventId: "inbound_tourism_boom" }, // インバウンド絶好調
+    { dayIndex: 240, eventId: "us_cpi_surprise_high" }, // 緩和しすぎでインフレ発生
   ],
 
   // ストーリーC: 金融政策・為替介入ルート
   routeC: [
-    { dayIndex: 10, eventId: "historic_yen_weakness" }, // 歴史的円安
-    { dayIndex: 12, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
-    { dayIndex: 15, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
-    { dayIndex: 20, eventId: "mof_yen_intervention" }, // 実弾介入 (1回目)
-    { dayIndex: 40, eventId: "us_jobs_report_strong" }, // 米雇用統計が強すぎ
-    { dayIndex: 45, eventId: "us_cpi_surprise_high" }, // 米CPIが予想上振れ
-    { dayIndex: 60, eventId: "rating_usdjpy_up" }, // 外資系が円安レポート
-    { dayIndex: 70, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
-    { dayIndex: 75, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
-    { dayIndex: 90, eventId: "boj_rate_hike_17years" }, // 日銀ついに利上げ発表
+    { dayIndex: 5, eventId: "historic_yen_weakness" }, // 歴史的円安
+    { dayIndex: 20, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 30, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 45, eventId: "mof_yen_intervention" }, // 実弾介入 (1回目)
+    { dayIndex: 80, eventId: "us_jobs_report_strong" }, // 米雇用統計が強すぎ
+    { dayIndex: 120, eventId: "us_cpi_surprise_high" }, // 米CPIが予想上振れ
+    { dayIndex: 125, eventId: "rating_usdjpy_up" }, // 外資系が円安レポート
+    { dayIndex: 130, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 140, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 150, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
+    { dayIndex: 160, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 200, eventId: "boj_rate_hike_17years" }, // 日銀ついに利上げ発表
   ],
 
   // ストーリーD: 半導体サイクルルート
@@ -809,27 +823,35 @@ export const STORY_ROUTES = {
     { dayIndex: 5, eventId: "ai_boom" }, // AIブーム到来
     { dayIndex: 15, eventId: "generative_ai_demand_semi" }, // 生成AI需要で受注最高
     { dayIndex: 30, eventId: "us_president_ai_semi_deregulation" }, // 米大統領、AI規制緩和示唆
-    { dayIndex: 45, eventId: "semi_subsidy_package" }, // 日本政府、半導体補助金
-    { dayIndex: 60, eventId: "china_export_restrictions_semi" }, // 対中輸出規制が半導体に拡大
-    { dayIndex: 80, eventId: "semi_inventory_worsens" }, // 在庫悪化でライン停止
-    { dayIndex: 100, eventId: "semi_factory_utilization_low" }, // 工場稼働率が30%に低下
-    { dayIndex: 120, eventId: "rating_semi_up" }, // 底打ち期待で証券会社が格上げ
-    { dayIndex: 140, eventId: "china_stimulus_package" }, // 中国が大規模景気刺激策
-    { dayIndex: 160, eventId: "ai_boom" }, // 第2次AIブーム到来
+    { dayIndex: 60, eventId: "semi_subsidy_package" }, // 日本政府、半導体補助金
+    { dayIndex: 70, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 80, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 100, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
+    { dayIndex: 110, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 90, eventId: "china_export_restrictions_semi" }, // 対中輸出規制が半導体に拡大
+    { dayIndex: 120, eventId: "semi_inventory_worsens" }, // 在庫悪化でライン停止
+    { dayIndex: 150, eventId: "semi_factory_utilization_low" }, // 工場稼働率が30%に低下
+    { dayIndex: 180, eventId: "rating_semi_up" }, // 底打ち期待で証券会社が格上げ
+    { dayIndex: 210, eventId: "china_stimulus_package" }, // 中国が大規模景気刺激策
+    { dayIndex: 240, eventId: "ai_boom" }, // 第2次AIブーム到来
   ],
 
   // ストーリーE: 政局・財政・地政学ルート
   routeE: [
     { dayIndex: 3, eventId: "lower_house_dissolution_election" }, // 衆院解散・総選挙へ
-    { dayIndex: 20, eventId: "new_cabinet_fiscal_stimulus" }, // 新内閣誕生、積極財政を発表
-    { dayIndex: 35, eventId: "income_tax_cut_consideration" }, // 政府、所得税減税の検討
-    { dayIndex: 50, eventId: "defense_budget_increase" }, // 防衛費、大幅増額方針
-    { dayIndex: 65, eventId: "middle_east_tension" }, // 中東情勢、悪化
-    { dayIndex: 75, eventId: "opec_plus_cuts_extended" }, // OPEC+が追加減産を延長
-    { dayIndex: 85, eventId: "middle_east_conflict_oil_spike" }, // 中東有事で原油が急騰
-    { dayIndex: 100, eventId: "consumption_tax_hike_announced" }, // 財源不足で消費税引き上げ表明
-    { dayIndex: 120, eventId: "nuclear_plant_restart" }, // エネルギー安全保障で原発再稼働
-    { dayIndex: 140, eventId: "rating_nikkei_up" }, // 政策期待で日本株オーバーウエイト
+    { dayIndex: 30, eventId: "new_cabinet_fiscal_stimulus" }, // 新内閣誕生、積極財政を発表
+    { dayIndex: 53, eventId: "income_tax_cut_consideration" }, // 政府、所得税減税の検討
+    { dayIndex: 75, eventId: "defense_budget_increase" }, // 防衛費、大幅増額方針
+    { dayIndex: 80, eventId: "mof_verbal_intervention_1" }, // 口先介入1『望ましくない』
+    { dayIndex: 100, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
+    { dayIndex: 110, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
+    { dayIndex: 120, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 135, eventId: "middle_east_tension" }, // 中東情勢、悪化
+    { dayIndex: 145, eventId: "opec_plus_cuts_extended" }, // OPEC+が追加減産を延長
+    { dayIndex: 160, eventId: "middle_east_conflict_oil_spike" }, // 中東有事で原油が急騰
+    { dayIndex: 180, eventId: "consumption_tax_hike_announced" }, // 財源不足で消費税引き上げ表明
+    { dayIndex: 200, eventId: "nuclear_plant_restart" }, // エネルギー安全保障で原発再稼働
+    { dayIndex: 220, eventId: "rating_nikkei_up" }, // 政策期待で日本株オーバーウエイト
   ],
 } as const;
 
@@ -858,123 +880,124 @@ export type Player = {
 // ✅ 8. ニュース画像のマッピング
 export const NEWS_IMAGE_MAP: Record<string, string> = {
   // --- 既存・重要イベント ---
-  "パンデミック発生！": "/images/news/corona_shock.png",
-  "AIブーム到来！": "/images/news/ai_boom.png",
-  "歴史的な円安": "/images/news/yen_shock.png",
-  "日銀、金利引き上げ": "/images/news/interest_rate.png",
-  "インバウンド絶好調": "/images/news/tourism_boom.png",
-  "中東情勢、悪化": "/images/news/oil_high.png",
-  "関税引き上げ！！": "/images/news/tariff.png",
+  "パンデミック発生！": "/images/news/imagesnewscorona_shock.png",
+  "AIブーム到来！": "/images/news/imagesnewsai_boom.png",
+  "歴史的な円安": "/images/news/imagesnewsyen_shock.png",
+  "日銀、金利引き上げ": "/images/news/imagesnewsinterest_rate.png",
+  "インバウンド絶好調": "/images/news/imagesnewstourism_boom.png",
+  "中東情勢、悪化": "/images/news/imagesnewsoil_high.png",
+  "関税引き上げ！！": "/images/news/imagesnewstariff.png",
 
   // --- 為替・財務省発言（口先介入） ---
-  "財務大臣『急激な円安は望ましくない』と発言": "/images/news/mof_speech.png",
-  "財務大臣『為替動向を注視している』とコメント": "/images/news/mof_speech.png",
-  "財務大臣『必要なら適切に対応する』と牽制": "/images/news/mof_speech.png",
-  "財務大臣『為替はファンダメンタルズを反映すべき』と発言": "/images/news/mof_speech.png",
-  "財務大臣『過度な投機による動きには適切に対応』と牽制": "/images/news/mof_speech.png",
-  "財務大臣、為替の急変動を『懸念』": "/images/news/mof_speech.png",
-  "財務省が円買い介入を実施": "/images/news/intervention.png",
-  "円フラッシュクラッシュ（急騰）": "/images/news/yen_rise.png",
-  "ドル円、『更なる円安』とのレポートが話題に": "/images/news/yen_shock.png",
+  "財務大臣『急激な円安は望ましくない』と発言": "/images/news/imagesnewsmof_speech.png",
+  "財務大臣『為替動向を注視している』とコメント": "/images/news/imagesnewsmof_speech.png",
+  "財務大臣『必要なら適切に対応する』と牽制": "/images/news/imagesnewsmof_speech.png",
+  "財務大臣『為替はファンダメンタルズを反映すべき』と発言": "/images/news/imagesnewsmof_speech.png",
+  "財務大臣『過度な投機による動きには適切に対応』と牽制": "/images/news/imagesnewsmof_speech.png",
+  "財務大臣、為替の急変動を『懸念』": "/images/news/imagesnewsmof_speech.png",
+  "財務省が円買い介入を実施": "/images/news/imagesnewsintervention.png",
+  "円フラッシュクラッシュ（急騰）": "/images/news/imagesnewsyen_rise.png",
+  "ドル円、『更なる円安』とのレポートが話題に": "/images/news/imagesnewsyen_shock.png",
 
   // --- 金融政策・経済指標 ---
-  "日銀がサプライズ利上げ": "/images/news/interest_rate.png",
-  "日銀が金融緩和を強化（QE再拡大）": "/images/news/money_printing.png",
-  "日銀が利上げ発表！！": "/images/news/interest_rate.png",
-  "米雇用統計がサプライズの強さ": "/images/news/usa_economy.png",
-  "米CPIが市場予想を大幅上振れ": "/images/news/usa_economy.png",
-  "米国の景気後退入りが公式宣言": "/images/news/recession.png",
-  "実質金利が上昇": "/images/news/interest_rate.png",
+  "日銀がサプライズ利上げ": "/images/news/imagesnewsinterest_rate.png",
+  "日銀が金融緩和を強化（QE再拡大）": "/images/news/imagesnewsmoney_printing.png",
+  "日銀が利上げ発表！！": "/images/news/imagesnewsinterest_rate.png",
+  "米雇用統計がサプライズの強さ": "/images/news/imagesnewsusa_economy.png",
+  "米CPIが市場予想を大幅上振れ": "/images/news/imagesnewsusa_economy.png",
+  "米国の景気後退入りが公式宣言": "/images/news/imagesnewsrecession.png",
+  "実質金利が上昇": "/images/news/imagesnewsinterest_rate.png",
 
   // --- 半導体・ハイテク ---
-  "対中輸出規制が半導体に拡大": "/images/news/trade_war.png",
-  "生成AI需要で設備受注が過去最高": "/images/news/semicon_factory.png",
-  "半導体、在庫悪化で一部ラインが出荷停止": "/images/news/factory_stop.png",
-  "半導体工場、稼働率30%に低下": "/images/news/factory_stop.png",
-  "半導体補助金・規制緩和パッケージ発表": "/images/news/subsidy.png",
-  "米大統領、AI・半導体規制の緩和を示唆": "/images/news/usa_president.png",
-  "AIが株式市場を“完全予測できる”という噂が拡散": "/images/news/ai_robot.png",
-  "半導体メーカーを『買い推奨』に引き上げ": "/images/news/rating_up.png",
-  "半導体、決算ミスで「失望売り」": "/images/news/earnings_down.png",
+  "対中輸出規制が半導体に拡大": "/images/news/imagesnewstrade_war.png",
+  "生成AI需要で設備受注が過去最高": "/images/news/imagesnewssemicon_factory.png",
+  "半導体、在庫悪化で一部ラインが出荷停止": "/images/news/imagesnewsfactory_stop.png",
+  "半導体工場、稼働率30%に低下": "/images/news/imagesnewsfactory_stop.png",
+  "半導体補助金・規制緩和パッケージ発表": "/images/news/imagesnewssubsidy.png",
+  "米大統領、AI・半導体規制の緩和を示唆": "/images/news/imagesnewsusa_president.png",
+  "AIが株式市場を“完全予測できる”という噂が拡散": "/images/news/imagesnewsai_robot.png",
+  "半導体メーカーを『買い推奨』に引き上げ": "/images/news/imagesnewsrating_up.png",
+  "半導体、決算ミスで「失望売り」": "/images/news/imagesnewsearnings_down.png",
 
   // --- 自動車・EV ---
-  "欧州でEV補助金が縮小": "/images/news/ev_car.png",
-  "アメリカにてプリウスに大規模リコールが発生": "/images/news/recall.png",
-  "北米で新型自動車の販売・利益率ともに改善": "/images/news/car_sales.png",
-  "外資系証券、自動車株を『弱気』に引き下げ": "/images/news/rating_down.png",
-  "自動車大手、決算で「サプライズ」上方修正": "/images/news/earnings_up.png",
-  "自動車メーカー、検査データ不正が発覚": "/images/news/apology.png",
+  "欧州でEV補助金が縮小": "/images/news/imagenewsev_car.png",
+  "アメリカにてプリウスに大規模リコールが発生": "/images/news/imagesnewsrecall.png",
+  "北米で新型自動車の販売・利益率ともに改善": "/images/news/imagesnewscar_sales.png",
+  "外資系証券、自動車株を『弱気』に引き下げ": "/images/news/imagesnewsrating_down.png",
+  "自動車大手、決算で「サプライズ」上方修正": "/images/news/imagesnewsearnings_up.png",
+  "自動車メーカー、検査データ不正が発覚": "/images/news/imagesnewsapology.png",
 
   // --- 製薬・バイオ ---
-  "治験フェーズ3試験が主要評価項目を達成": "/images/news/pharma_success.png",
-  "治験フェーズ3試験が失敗": "/images/news/pharma_fail.png",
-  "薬価改定でマイナス幅が拡大": "/images/news/drug_price.png",
-  "画期的新薬の承認審査が加速": "/images/news/pharma_success.png",
-  "新薬承認！！": "/images/news/pharma_success.png",
-  "南極で未知のウイルス検出、国際研究機関が警戒レベル引き上げ": "/images/news/bio_hazard.png",
-  "製薬株を『弱気』に変更、薬価改定を懸念": "/images/news/rating_down.png",
-  "製薬大手、米バイオ企業を買収発表": "/images/news/ma_deal.png",
+  "治験フェーズ3試験が主要評価項目を達成": "/images/news/imagesnewspharma_success.png",
+  "治験フェーズ3試験が失敗": "/images/news/imagesnewspharma_fail.png",
+  "薬価改定でマイナス幅が拡大": "/images/news/imagesnewsdrug_price.png",
+  "画期的新薬の承認審査が加速": "/images/news/imagesnewspharma_success.png",
+  "新薬承認！！": "/images/news/imagesnewspharma_success.png",
+  "南極で未知のウイルス検出、国際研究機関が警戒レベル引き上げ": "/images/news/imagesnewsbio_hazard.png",
+  "製薬株を『弱気』に変更、薬価改定を懸念": "/images/news/imagesnewsrating_down.png",
+  "製薬大手、米バイオ企業を買収発表": "/images/news/imagesnewsma_deal.png",
 
   // --- 小売・ニトリ ---
-  "ニトリ、海外出店で立ち上げ費用が先行": "/images/news/retail_store.png",
-  "ニトリ、既存店売上が客数・客単価ともに伸長": "/images/news/retail_sales_up.png",
-  "小売り株を『買い』に格上げ": "/images/news/rating_up.png",
-  "ニトリ、業績予想を「下方修正」": "/images/news/earnings_down.png",
+  "ニトリ、海外出店で立ち上げ費用が先行": "/images/news/imagesnewsretail_store.png",
+  "ニトリ、既存店売上が客数・客単価ともに伸長": "/images/news/imagesnewsretail_sales_up.png",
+  "小売り株を『買い』に格上げ": "/images/news/imagesnewsrating_up.png",
+  "ニトリ、業績予想を「下方修正」": "/images/news/imagesnewsearnings_down.png",
 
   // --- エネルギー・商社 ---
-  "OPEC+が追加減産を延長": "/images/news/oil_pump.png",
-  "石油代替となる“藻類資源”が発見される": "/images/news/bio_fuel.png",
-  "中東有事で原油が急騰": "/images/news/oil_fire.png",
-  "石油株の格付けを『弱気』に引き下げ": "/images/news/rating_down.png",
-  "ENEOS、新規油田の権益獲得": "/images/news/oil_rig.png",
+  "OPEC+が追加減産を延長": "/images/news/imagesnewsoil_pump.png",
+  "石油代替となる“藻類資源”が発見される": "/images/news/imagesnewsbio_fuel.png",
+  "中東有事で原油が急騰": "/images/news/imagesnewsoil_fire.png",
+  "石油株の格付けを『弱気』に引き下げ": "/images/news/imagesnewsrating_down.png",
+  "ENEOS、新規油田の権益獲得": "/images/news/imagesnewsoil_rig.png",
 
   // --- ゲーム・任天堂 ---
-  "任天堂、自己株買い・増配を同時発表": "/images/news/share_buyback.png",
-  "任天堂、新型ハードを正式発表": "/images/news/game_hardware.png",
-  "新型ゲーム機での超期待作の発売が延期": "/images/news/game_delay.png",
-  "ゲーム株を『中立→買い』に格上げ": "/images/news/rating_up.png",
-  "ポケモン新作売り上げ好調！": "/images/news/game_hit.png",
-  "任天堂、AI企業と資本業務提携": "/images/news/ma_deal.png",
+  "任天堂、自己株買い・増配を同時発表": "/images/news/imagesnewsshare_buyback.png",
+  "任天堂、新型ハードを正式発表": "/images/news/imagesnewsgame_hardware.png",
+  "新型ゲーム機での超期待作の発売が延期": "/images/news/imagesnewsgame_delay.png",
+  "ゲーム株を『中立→買い』に格上げ": "/images/news/imagesnewsrating_up.png",
+  "ポケモン新作売り上げ好調！": "/images/news/imagesnewsgame_hit.png",
+  "任天堂、AI企業と資本業務提携": "/images/news/imagesnewsma_deal.png",
 
   // --- 航空・電力・インフラ ---
-  "原発の再稼働が正式決定": "/images/news/nuclear.png",
-  "国際線の発着枠が拡大": "/images/news/airport.png",
-  "燃料費サーチャージが上昇": "/images/news/airplane_fuel.png",
-  "航空会社、人手不足で一部路線を減便": "/images/news/airport_crowd.png",
-  "猛暑による電力不足": "/images/news/sun_hot.png",
-  "猛暑で電力需給ひっ迫": "/images/news/sun_hot.png",
-  "電力株を『弱気』に格下げ": "/images/news/rating_down.png",
-  "航空株を『買い』に引き上げ、需要回復を評価": "/images/news/rating_up.png",
-  "電力会社で顧客情報漏洩が発覚": "/images/news/apology.png",
-  "大型台風で国内工場が操業停止": "/images/news/typhoon.png",
+  "原発の再稼働が正式決定": "/images/news/imagesnewsnuclear.png",
+  "国際線の発着枠が拡大": "/images/news/imagesnewsairport.png",
+  "燃料費サーチャージが上昇": "/images/news/imagesnewsairplane_fuel.png",
+  "航空会社、人手不足で一部路線を減便": "/images/news/imagesnewsairport_crowd.png",
+  "猛暑による電力不足": "/images/news/imagesnewssun_hot.png",
+  "猛暑で電力需給ひっ迫": "/images/news/imagesnewssun_hot.png",
+  "電力株を『弱気』に格下げ": "/images/news/imagesnewsrating_down.png",
+  "航空株を『買い』に引き上げ、需要回復を評価": "/images/news/imagesnewsrating_up.png",
+  "電力会社で顧客情報漏洩が発覚": "/images/news/imagesnewsapology.png",
+  "大型台風で国内工場が操業停止": "/images/news/imagesnewstyphoon.png",
 
   // --- 政治・財政 ---
-  "衆院解散・総選挙へ": "/images/news/election.png",
-  "新内閣誕生、積極財政を発表": "/images/news/diet_building.png",
-  "政府、所得税減税の検討に着手": "/images/news/tax_cut.png",
-  "防衛費、大幅増額方針を政府が示す": "/images/news/defense.png",
-  "消費税の引き上げ方針を政府が表明": "/images/news/tax_up.png",
-  "中国政府、大規模景気刺激策を発表": "/images/news/china_economy.png",
+  "衆院解散・総選挙へ": "/images/news/imagesnewselection.png",
+  "新内閣誕生、積極財政を発表": "/images/news/imagesnewsdiet_building.png",
+  "政府、所得税減税の検討に着手": "/images/news/imagesnewstax_cut.png",
+  "防衛費、大幅増額方針を政府が示す": "/images/news/imagesnewsdefense.png",
+  "消費税の引き上げ方針を政府が表明": "/images/news/imagesnewstax_up.png",
+  "中国政府、大規模景気刺激策を発表": "/images/news/imagesnewschina_economy.png",
 
   // --- 金融・市況全体 ---
-  "大口融資先でデフォルト発生": "/images/news/bank_fail.png",
-  "決算シーズンでEPS上方修正が相次ぐ": "/images/news/stock_chart_up.png",
-  "地政学リスクが急騰": "/images/news/war_risk.png",
-  "大手証券、銀行株を『買い』に格上げ": "/images/news/rating_up.png",
-  "金鉱株を『買い』に引き上げ、安全資産需要を評価": "/images/news/rating_up.png",
-  "日本株全体を『オーバーウエイト』へ引き上げ": "/images/news/rating_up.png",
-  "メガバンク、決算で最高益を更新": "/images/news/earnings_up.png",
-  "バフェット、日本株は“過小評価”と発言": "/images/news/investor_legend.png",
+  "大口融資先でデフォルト発生": "/images/news/imagesnewsbank_fail.png",
+  "決算シーズンでEPS上方修正が相次ぐ": "/images/news/imagesnewsstock_chart_up.png",
+  "地政学リスクが急騰": "/images/news/imagesnewswar_risk.png",
+  "大手証券、銀行株を『買い』に格上げ": "/images/news/imagesnewsrating_up.png",
+  "金鉱株を『買い』に引き上げ、安全資産需要を評価": "/images/news/imagesnewsrating_up.png",
+  "日本株全体を『オーバーウエイト』へ引き上げ": "/images/news/imagesnewsrating_up.png",
+  "メガバンク、決算で最高益を更新": "/images/news/imagesnewsearnings_up.png",
+  "バフェット、日本株は“過小評価”と発言": "/images/news/imagesnewsinvestor_legend.png",
 
   // --- 国際金融・ショック ---
-  "スイス大手銀行が信用不安！": "/images/news/bank_panic.png",
-  "スイス大手銀行の信用不安、払拭！": "/images/news/bank_safe.png",
-  "スイス大手銀行、破綻！": "/images/news/bank_collapse.png",
+  "スイス大手銀行が信用不安！": "/images/news/imagesnewsbank_panic.png",
+  "スイス大手銀行の信用不安、払拭！": "/images/news/imagesnewsbank_safe.png",
+  "スイス大手銀行、破綻！": "/images/news/imagesnewsbank_collapse.png",
 
   // --- その他・ネタ ---
-  "東京湾でUFO目撃情報、市場は一時混乱": "/images/news/ufo.png",
-  "金の塊が詰まった隕石が世界に落下！": "/images/news/meteorite.png",
+  "東京湾でUFO目撃情報、市場は一時混乱": "/images/news/imagesnewsufo.png",
+  "金の塊が詰まった隕石が世界に落下！": "/images/news/imagesnewsmeteorite.png",
 };
+
 
 // ✅ 9. デフォルト画像
 export const DEFAULT_NEWS_IMAGE = "/images/news/default.png";
@@ -1002,13 +1025,13 @@ export const SIGMA: Partial<Record<TickerId, number>> = {
 };
 
 export const TICKER_DISPLAY_NAME: Record<TickerId, string> = {
-  BANK: "🏦 四井為友銀行",
+  BANK: "🏦 三井住友銀行",
   SEMI: "🖥️ 東亰エレクトロン",
-  AUTO: "🚗 トヨダ自動車",
-  PHARMA: "💊 大正製薬",
+  AUTO: "🚗 トヨタ自動車",
+  PHARMA: "💊 武田製薬",
   NITORI: "🛋️ ニトリ",
   UTIL: "⚡️ 関西電力",
-  AIR: "✈️ JAL/ANA",
+  AIR: "✈️ ANA",
   GAME: "🎮 任天堂",
   ENEOS: "🛢️ ENEOS",
   GOLD: "🪙 ゴールド",
