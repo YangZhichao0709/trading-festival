@@ -306,6 +306,19 @@ export default function GameScreen({ playerName }: { playerName: string }) {
   const chartsRef = useRef<Record<string, IChartApi | undefined>>({})
   const seriesRef = useRef<Record<string, ISeriesApi<"Candlestick"> | undefined>>({})
 
+  // 音を鳴らす用の関数
+  const playSound = (type: "action" | "news") => {
+    const paths = {
+      action: "/sounds/action.wav", // 注文・決済
+      news: "/sounds/news.wav",     // ニュース速報
+    };
+    
+    const audio = new Audio(paths[type]);
+    audio.volume = 0.5; 
+    audio.currentTime = 0; // 連打対応
+    audio.play().catch((e) => console.error("Audio play failed", e));
+  };
+
   const updateQtyBasedOnPct = (newPct: number, targetTicker: TickerId) => {
     // 1. 割合(%)を 10% 刻みのスナップされた値に正規化
     const snappedPct = Math.round(newPct / 10) * 10;
@@ -453,6 +466,7 @@ export default function GameScreen({ playerName }: { playerName: string }) {
 
     const handleGameNews = (data: ActiveEventData) => {
       console.log("Received game:news", data); // デバッグ用
+      playSound("news");
       if (data && data.eventDefinition) {
         setNewsPopup(data.eventDefinition);
       }
@@ -580,6 +594,7 @@ export default function GameScreen({ playerName }: { playerName: string }) {
       const data = await res.json();
       if (data.error) return alert(data.error);
       setQty("");
+      playSound("action");
     } catch {
       alert("通信エラーが発生しました。");
     }

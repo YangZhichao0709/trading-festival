@@ -515,15 +515,15 @@ export const EVENTS = [
     description:
       "米大統領が関税の引き上げを発表。100%を越える関税を課される国も。",
     tickers: [
-      { ticker: "BANK", a: 3, k: -0.4 },
-      { ticker: "SEMI", a: 3, k: -0.4 },
-      { ticker: "AUTO", a: 3, k: -0.4 },
-      { ticker: "PHARMA", a: 3, k: -0.4 },
-      { ticker: "NITORI", a: 3, k: -0.4 },
-      { ticker: "UTIL", a: 3, k: -0.4 },
-      { ticker: "AIR", a: 3, k: -0.4 },
-      { ticker: "GAME", a: 3, k: -0.4 },
-      { ticker: "ENEOS", a: 3, k: -0.4 },
+      { ticker: "BANK", a: 3, k: -0.2 },
+      { ticker: "SEMI", a: 3, k: -0.2 },
+      { ticker: "AUTO", a: 3, k: -0.2 },
+      { ticker: "PHARMA", a: 3, k: -0.2 },
+      { ticker: "NITORI", a: 3, k: -0.2 },
+      { ticker: "UTIL", a: 3, k: -0.2 },
+      { ticker: "AIR", a: 3, k: -0.2 },
+      { ticker: "GAME", a: 3, k: -0.2 },
+      { ticker: "ENEOS", a: 3, k: -0.2 },
     ],
   },
   {
@@ -562,7 +562,7 @@ export const EVENTS = [
     description:
       "首相が突然の衆議院解散を発表。政策の先行きに対する不確実性が高まったことで、大型株に一時売りが殺到。",
     tickers: [
-      { ticker: "NIKKEI", a: 3, k: -0.12 },
+      { ticker: "NIKKEI", a: 3, k: -0.08 },
       { ticker: "BANK", a: 2, k: -0.05 },
       { ticker: "AUTO", a: 2, k: -0.12 },
     ],
@@ -746,7 +746,7 @@ export const EVENTS = [
   },
   {
     id: "gold_meteorite_crash",
-    name: "金の塊が詰まった隕石が世界に落下！",
+    name: "金の塊が詰まった隕石が地球に落下！",
     description:
       "世界各地で目撃された巨大隕石の分析により、中に大量の金が含まれていたことが判明！供給過多になるとの思惑が広がり、金市場では短期的に大きな売り圧力が発生。",
     tickers: [{ ticker: "GOLD", a: 3, k: -0.35 }],
