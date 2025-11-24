@@ -515,15 +515,15 @@ export const EVENTS = [
     description:
       "米大統領が関税の引き上げを発表。100%を越える関税を課される国も。",
     tickers: [
-      { ticker: "BANK", a: 3, k: -0.4 },
+      { ticker: "BANK", a: 3, k: -0.1 },
       { ticker: "SEMI", a: 3, k: -0.4 },
-      { ticker: "AUTO", a: 3, k: -0.4 },
-      { ticker: "PHARMA", a: 3, k: -0.4 },
-      { ticker: "NITORI", a: 3, k: -0.4 },
-      { ticker: "UTIL", a: 3, k: -0.4 },
-      { ticker: "AIR", a: 3, k: -0.4 },
-      { ticker: "GAME", a: 3, k: -0.4 },
-      { ticker: "ENEOS", a: 3, k: -0.4 },
+      { ticker: "AUTO", a: 3, k: -0.2 },
+      { ticker: "PHARMA", a: 3, k: -0.1  },
+      { ticker: "NITORI", a: 3, k: -0.1 },
+      { ticker: "UTIL", a: 3, k: -0.1 },
+      { ticker: "AIR", a: 3, k: -0.2 },
+      { ticker: "GAME", a: 3, k: -0.3 },
+      { ticker: "ENEOS", a: 3, k: -0.1 },
     ],
   },
   {
@@ -779,9 +779,11 @@ export const STORY_ROUTES = {
     { dayIndex: 150, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
     { dayIndex: 160, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
     { dayIndex: 172, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 180, eventId: "boj_easing_strengthened_qe" }, // 日銀が金融緩和強化
     { dayIndex: 190, eventId: "swiss_bank_credit_fears_2_resolved" }, // 信用不安、払拭
     { dayIndex: 200, eventId: "us_president_ai_semi_deregulation",}, //バフェット
-    { dayIndex: 210, eventId: "rating_nikkei_up",} //日本株オーバーウェイト
+    { dayIndex: 210, eventId: "rating_nikkei_up",}, //日本株オーバーウェイト
+    { dayIndex: 220, eventId: "ai_boom" }, // AIブーム到来
   ],
 
   // ストーリーB: パンデミックルート

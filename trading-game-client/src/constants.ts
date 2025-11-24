@@ -515,15 +515,15 @@ export const EVENTS = [
     description:
       "米大統領が関税の引き上げを発表。100%を越える関税を課される国も。",
     tickers: [
-      { ticker: "BANK", a: 3, k: -0.2 },
-      { ticker: "SEMI", a: 3, k: -0.2 },
+      { ticker: "BANK", a: 3, k: -0.1 },
+      { ticker: "SEMI", a: 3, k: -0.4 },
       { ticker: "AUTO", a: 3, k: -0.2 },
-      { ticker: "PHARMA", a: 3, k: -0.2 },
-      { ticker: "NITORI", a: 3, k: -0.2 },
-      { ticker: "UTIL", a: 3, k: -0.2 },
+      { ticker: "PHARMA", a: 3, k: -0.1  },
+      { ticker: "NITORI", a: 3, k: -0.1 },
+      { ticker: "UTIL", a: 3, k: -0.1 },
       { ticker: "AIR", a: 3, k: -0.2 },
-      { ticker: "GAME", a: 3, k: -0.2 },
-      { ticker: "ENEOS", a: 3, k: -0.2 },
+      { ticker: "GAME", a: 3, k: -0.3 },
+      { ticker: "ENEOS", a: 3, k: -0.1 },
     ],
   },
   {
@@ -562,7 +562,7 @@ export const EVENTS = [
     description:
       "首相が突然の衆議院解散を発表。政策の先行きに対する不確実性が高まったことで、大型株に一時売りが殺到。",
     tickers: [
-      { ticker: "NIKKEI", a: 3, k: -0.08 },
+      { ticker: "NIKKEI", a: 3, k: -0.12 },
       { ticker: "BANK", a: 2, k: -0.05 },
       { ticker: "AUTO", a: 2, k: -0.12 },
     ],
@@ -746,7 +746,7 @@ export const EVENTS = [
   },
   {
     id: "gold_meteorite_crash",
-    name: "金の塊が詰まった隕石が地球に落下！",
+    name: "金の塊が詰まった隕石が世界に落下！",
     description:
       "世界各地で目撃された巨大隕石の分析により、中に大量の金が含まれていたことが判明！供給過多になるとの思惑が広がり、金市場では短期的に大きな売り圧力が発生。",
     tickers: [{ ticker: "GOLD", a: 3, k: -0.35 }],
@@ -779,9 +779,11 @@ export const STORY_ROUTES = {
     { dayIndex: 150, eventId: "mof_verbal_intervention_3" }, // 口先介入2『適切に対応』
     { dayIndex: 160, eventId: "mof_verbal_intervention_5" }, // 口先介入3『投機には対応』
     { dayIndex: 172, eventId: "mof_yen_intervention" }, // 再度の実弾介入 (2回目)
+    { dayIndex: 180, eventId: "boj_easing_strengthened_qe" }, // 日銀が金融緩和強化
     { dayIndex: 190, eventId: "swiss_bank_credit_fears_2_resolved" }, // 信用不安、払拭
     { dayIndex: 200, eventId: "us_president_ai_semi_deregulation",}, //バフェット
-    { dayIndex: 210, eventId: "rating_nikkei_up",} //日本株オーバーウェイト
+    { dayIndex: 210, eventId: "rating_nikkei_up",}, //日本株オーバーウェイト
+    { dayIndex: 220, eventId: "ai_boom" }, // AIブーム到来
   ],
 
   // ストーリーB: パンデミックルート
